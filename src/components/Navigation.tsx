@@ -1,4 +1,14 @@
 import { Link, useLocation } from 'react-router-dom'
+import {
+  House,
+  FolderOpen,
+  Search,
+  Copy,
+  FilePenLine,
+  CircleHelp,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 
 interface NavigationProps {
   isOpen: boolean
@@ -9,10 +19,15 @@ function Navigation({ isOpen, onToggle }: NavigationProps) {
   const location = useLocation()
   
   const navItems = [
-    { path: '/', label: 'Home', icon: '🏠' },
-    { path: '/files', label: 'File List', icon: '📂' },
-    { path: '/files-advanced', label: 'File List Advanced', icon: '🔍' },
-    { path: '/file-copy', label: 'Copy File', icon: '📋' }
+    { path: '/', label: 'Home', icon: House },
+    { path: '/files', label: 'File List', icon: FolderOpen },
+    { path: '/files-advanced', label: 'File List Advanced', icon: Search },
+    { path: '/file-copy', label: 'Copy File', icon: Copy },
+    { path: '/text-editor', label: 'Powerful Text Editor', icon: FilePenLine }
+  ]
+
+  const infoItems = [
+    { path: '/help', label: 'Help / Bantuan', icon: CircleHelp }
   ]
   
   return (
@@ -27,13 +42,19 @@ function Navigation({ isOpen, onToggle }: NavigationProps) {
           className="p-2 hover:bg-gray-700 rounded transition-colors"
           title={isOpen ? 'Collapse' : 'Expand'}
         >
-          {isOpen ? '‹' : '›'}
+          {isOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
         </button>
       </div>
 
-      {/* Navigation Items */}
+      {/* Feature Navigation */}
+      <div className="px-4 pt-3 pb-1 text-xs uppercase tracking-wide text-gray-400">
+        {isOpen ? 'Features' : ''}
+      </div>
       <nav className="flex flex-col">
         {navItems.map((item) => (
+          (() => {
+            const Icon = item.icon
+            return (
           <Link
             key={item.path}
             to={item.path}
@@ -44,11 +65,46 @@ function Navigation({ isOpen, onToggle }: NavigationProps) {
             }`}
             title={!isOpen ? item.label : ''}
           >
-            <span className="text-lg w-6 flex-shrink-0">{item.icon}</span>
+            <span className="w-6 flex-shrink-0">
+              <Icon size={18} />
+            </span>
             {isOpen && <span>{item.label}</span>}
           </Link>
+            )
+          })()
         ))}
       </nav>
+
+      {/* Help Section */}
+      <div className="border-t border-gray-700 mt-3 pt-3">
+        <div className="px-4 pb-1 text-xs uppercase tracking-wide text-gray-400">
+          {isOpen ? 'Help' : ''}
+        </div>
+        <nav className="flex flex-col">
+          {infoItems.map((item) => (
+            (() => {
+              const Icon = item.icon
+              return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`px-4 py-3 transition-colors flex items-center gap-3 ${
+                location.pathname === item.path
+                  ? 'bg-gray-700 border-l-4 border-amber-400 font-semibold'
+                  : 'hover:bg-gray-700'
+              }`}
+              title={!isOpen ? item.label : ''}
+            >
+              <span className="w-6 flex-shrink-0">
+                <Icon size={18} />
+              </span>
+              {isOpen && <span>{item.label}</span>}
+            </Link>
+              )
+            })()
+          ))}
+        </nav>
+      </div>
     </aside>
   )
 }

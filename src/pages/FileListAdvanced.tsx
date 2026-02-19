@@ -1,5 +1,16 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  Check,
+  Copy,
+  Folder,
+  FileText,
+  SearchCheck,
+  SearchX,
+  LoaderCircle,
+  FolderOpen,
+  Lightbulb,
+} from 'lucide-react'
 
 interface FoundFile {
   name: string
@@ -126,8 +137,9 @@ function FileListAdvanced() {
       <p className="text-lg mb-6">
         Enter file names (one per line) and specify a directory to search for them.
         <br />
-        <span className="text-sm text-gray-600">
-          💡 Tip: You can search without file extensions (e.g., "document" will find "document.txt", "document.pdf", etc.)
+        <span className="text-sm text-gray-600 inline-flex items-center gap-1">
+          <Lightbulb size={14} />
+          Tip: You can search without file extensions (e.g., "document" will find "document.txt", "document.pdf", etc.)
         </span>
       </p>
 
@@ -195,21 +207,26 @@ function FileListAdvanced() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold text-green-700">
-                  ✓ Found Files ({result.foundCount})
+                  <span className="inline-flex items-center gap-2">
+                    <SearchCheck size={20} />
+                    Found Files ({result.foundCount})
+                  </span>
                 </h2>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleCopy('found')}
                     className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center gap-2"
                   >
-                    {copySuccess === 'found' ? '✓ Copied!' : '📋 Copy Found'}
+                    {copySuccess === 'found' ? <Check size={16} /> : <Copy size={16} />}
+                    {copySuccess === 'found' ? 'Copied!' : 'Copy Found'}
                   </button>
                   <button
                     onClick={handleOpenFiles}
                     disabled={openingFiles}
                     className="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {openingFiles ? '⏳ Opening...' : '🔓 Open All Files'}
+                    {openingFiles ? <LoaderCircle size={16} className="animate-spin" /> : <FolderOpen size={16} />}
+                    {openingFiles ? 'Opening...' : 'Open All Files'}
                   </button>
                 </div>
               </div>
@@ -218,7 +235,10 @@ function FileListAdvanced() {
                   <li key={index} className="px-3 py-2 bg-green-50 rounded hover:bg-green-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs px-2 py-1 bg-green-200 rounded">
-                        {file.type === 'directory' ? '📁 DIR' : '📄 FILE'}
+                        <span className="inline-flex items-center gap-1">
+                          {file.type === 'directory' ? <Folder size={12} /> : <FileText size={12} />}
+                          {file.type === 'directory' ? 'DIR' : 'FILE'}
+                        </span>
                       </span>
                       <div className="flex flex-col">
                         <span className="font-medium">{file.name}</span>
@@ -245,13 +265,17 @@ function FileListAdvanced() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold text-red-700">
-                  ✗ Not Found Files ({result.notFoundCount})
+                  <span className="inline-flex items-center gap-2">
+                    <SearchX size={20} />
+                    Not Found Files ({result.notFoundCount})
+                  </span>
                 </h2>
                 <button
                   onClick={() => handleCopy('notfound')}
                   className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex items-center gap-2"
                 >
-                  {copySuccess === 'notfound' ? '✓ Copied!' : '📋 Copy Not Found'}
+                  {copySuccess === 'notfound' ? <Check size={16} /> : <Copy size={16} />}
+                  {copySuccess === 'notfound' ? 'Copied!' : 'Copy Not Found'}
                 </button>
               </div>
               <ul className="space-y-2">
@@ -270,7 +294,8 @@ function FileListAdvanced() {
               onClick={() => handleCopy('all')}
               className="bg-purple-500 text-white px-6 py-3 rounded hover:bg-purple-600 w-full flex items-center justify-center gap-2"
             >
-              {copySuccess === 'all' ? '✓ Copied!' : '📋 Copy Complete Report'}
+              {copySuccess === 'all' ? <Check size={16} /> : <Copy size={16} />}
+              {copySuccess === 'all' ? 'Copied!' : 'Copy Complete Report'}
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Check, Copy, Folder, FileText } from 'lucide-react'
 
 interface FileDetail {
   name: string
@@ -99,7 +100,8 @@ function FileList() {
               onClick={handleCopyList}
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center gap-2"
             >
-              {copySuccess ? '✓ Copied!' : '📋 Copy List'}
+              {copySuccess ? <Check size={16} /> : <Copy size={16} />}
+              {copySuccess ? 'Copied!' : 'Copy List'}
             </button>
           </div>
           <ul className="space-y-2">
@@ -107,7 +109,10 @@ function FileList() {
               <li key={index} className="px-3 py-2 bg-gray-50 rounded hover:bg-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs px-2 py-1 bg-gray-200 rounded">
-                    {file.type === 'directory' ? '📁 DIR' : '📄 FILE'}
+                    <span className="inline-flex items-center gap-1">
+                      {file.type === 'directory' ? <Folder size={12} /> : <FileText size={12} />}
+                      {file.type === 'directory' ? 'DIR' : 'FILE'}
+                    </span>
                   </span>
                   <span>{file.name}</span>
                 </div>

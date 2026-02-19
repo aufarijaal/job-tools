@@ -72,5 +72,14 @@ export default defineConfig(({ command }) => {
       }
     })(),
     clearScreen: false,
+    build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          monaco: ['monaco-editor']
+        }
+      }
+    }
+  }
   }
 })

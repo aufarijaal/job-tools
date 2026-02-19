@@ -1,5 +1,15 @@
 import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  Lightbulb,
+  LoaderCircle,
+  Play,
+  Clock3,
+  Settings,
+  CircleCheck,
+  CircleX,
+  Trash2,
+} from 'lucide-react'
 
 interface CopyResult {
   success: boolean
@@ -157,13 +167,13 @@ function FileCopy() {
           
           if (result.copiedCount > 0) {
             result.copied.forEach((file: { name: string; path: string }) => {
-              addLog(plan.id, `✓ Copied: ${file.name}`, 'success')
+              addLog(plan.id, `Copied: ${file.name}`, 'success')
             })
           }
           
           if (result.failedCount > 0) {
             result.failed.forEach((file: { name: string; reason: string }) => {
-              addLog(plan.id, `✗ Failed: ${file.name} - ${file.reason}`, 'error')
+              addLog(plan.id, `Failed: ${file.name} - ${file.reason}`, 'error')
             })
           }
         }
@@ -237,8 +247,9 @@ function FileCopy() {
       <p className="text-lg mb-6">
         Create multiple copy plans and execute them sequentially. 
         <br />
-        <span className="text-sm text-gray-600">
-          💡 Build a queue of copy operations, then run them all at once with error handling
+        <span className="text-sm text-gray-600 inline-flex items-center gap-1">
+          <Lightbulb size={14} />
+          Build a queue of copy operations, then run them all at once with error handling
         </span>
       </p>
 
@@ -333,9 +344,10 @@ function FileCopy() {
               <button
                 onClick={handleRunAllPlans}
                 disabled={isRunning || pendingCount === 0}
-                className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600 disabled:bg-gray-400"
+                className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600 disabled:bg-gray-400 inline-flex items-center gap-2"
               >
-                {isRunning ? '⏳ Running All...' : '▶️ Run All'}
+                {isRunning ? <LoaderCircle size={16} className="animate-spin" /> : <Play size={16} />}
+                {isRunning ? 'Running All...' : 'Run All'}
               </button>
               {completedCount > 0 && (
                 <button
@@ -386,10 +398,10 @@ function FileCopy() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">
-                          {plan.status === 'pending' && '⏳'}
-                          {plan.status === 'running' && '⚙️'}
-                          {plan.status === 'completed' && '✅'}
-                          {plan.status === 'failed' && '❌'}
+                          {plan.status === 'pending' && <Clock3 size={20} />}
+                          {plan.status === 'running' && <Settings size={20} className="animate-spin" />}
+                          {plan.status === 'completed' && <CircleCheck size={20} />}
+                          {plan.status === 'failed' && <CircleX size={20} />}
                         </span>
                         <div>
                           <p className="font-semibold">
@@ -418,17 +430,19 @@ function FileCopy() {
                         <button
                           onClick={() => handleRunSinglePlan(plan)}
                           disabled={isRunning}
-                          className="bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-600 disabled:bg-gray-400 text-sm"
+                          className="bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-600 disabled:bg-gray-400 text-sm inline-flex items-center gap-1"
                         >
-                          ▶️ Run
+                          <Play size={14} />
+                          Run
                         </button>
                       )}
                       <button
                         onClick={() => handleDeletePlan(plan.id)}
                         disabled={isRunning && currentJobId === plan.id}
-                        className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 disabled:bg-gray-400 text-sm"
+                        className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 disabled:bg-gray-400 text-sm inline-flex items-center"
+                        aria-label="Delete plan"
                       >
-                        🗑️
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -464,12 +478,12 @@ function FileCopy() {
                         <p className="text-sm font-medium text-gray-600 mb-2">Result:</p>
                         {plan.result.copiedCount > 0 && (
                           <div className="bg-green-50 p-2 rounded mb-2">
-                            <p className="text-sm text-green-700">✓ Successfully copied: {plan.result.copiedCount}</p>
+                            <p className="text-sm text-green-700 inline-flex items-center gap-1"><CircleCheck size={14} />Successfully copied: {plan.result.copiedCount}</p>
                           </div>
                         )}
                         {plan.result.failedCount > 0 && (
                           <div className="bg-red-50 p-2 rounded">
-                            <p className="text-sm text-red-700">✗ Failed: {plan.result.failedCount}</p>
+                            <p className="text-sm text-red-700 inline-flex items-center gap-1"><CircleX size={14} />Failed: {plan.result.failedCount}</p>
                             {plan.result.failed.map((f, idx) => (
                               <p key={idx} className="text-xs text-red-600">{f.name}: {f.reason}</p>
                             ))}

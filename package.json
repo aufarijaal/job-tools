@@ -1,6 +1,6 @@
 {
   "name": "job-tools",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "main": "dist-electron/main/index.js",
   "description": "Job Tools",
   "license": "MIT",
@@ -19,11 +19,18 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@monaco-editor/react": "^4.7.0",
     "electron-updater": "^6.3.9",
-    "react-router-dom": "^7.13.0"
+    "lucide-react": "^0.575.0",
+    "monaco-editor": "^0.55.1",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.13.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
