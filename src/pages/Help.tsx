@@ -2,31 +2,27 @@ import { useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-import homeEn from '../help/en/home.md?raw'
 import fileListEn from '../help/en/file-list.md?raw'
 import fileListAdvancedEn from '../help/en/file-list-advanced.md?raw'
 import fileCopyEn from '../help/en/file-copy.md?raw'
 import textEditorEn from '../help/en/text-editor.md?raw'
 
-import homeId from '../help/id/home.md?raw'
 import fileListId from '../help/id/file-list.md?raw'
 import fileListAdvancedId from '../help/id/file-list-advanced.md?raw'
 import fileCopyId from '../help/id/file-copy.md?raw'
 import textEditorId from '../help/id/text-editor.md?raw'
 
 type Language = 'en' | 'id'
-type Topic = 'home' | 'file-list' | 'file-list-advanced' | 'file-copy' | 'text-editor'
+type Topic = 'file-list' | 'file-list-advanced' | 'file-copy' | 'text-editor'
 
 const docs = {
   en: {
-    home: homeEn,
     'file-list': fileListEn,
     'file-list-advanced': fileListAdvancedEn,
     'file-copy': fileCopyEn,
     'text-editor': textEditorEn,
   },
   id: {
-    home: homeId,
     'file-list': fileListId,
     'file-list-advanced': fileListAdvancedId,
     'file-copy': fileCopyId,
@@ -36,7 +32,7 @@ const docs = {
 
 function Help() {
   const [language, setLanguage] = useState<Language>('id')
-  const [topic, setTopic] = useState<Topic>('home')
+  const [topic, setTopic] = useState<Topic>('file-list')
 
   const content = useMemo(() => docs[language][topic], [language, topic])
 
@@ -67,9 +63,8 @@ function Help() {
             onChange={(event) => setTopic(event.target.value as Topic)}
             className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="home">Home</option>
-            <option value="file-list">File List</option>
-            <option value="file-list-advanced">File List Advanced</option>
+            <option value="file-list">File Lister</option>
+            <option value="file-list-advanced">Multiple File Opener</option>
             <option value="file-copy">Copy File</option>
             <option value="text-editor">Powerful Text Editor</option>
           </select>

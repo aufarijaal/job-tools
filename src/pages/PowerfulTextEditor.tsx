@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Editor, { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
+import { toast } from "sonner";
 
 loader.config({ monaco });
 
@@ -19,7 +20,6 @@ function PowerfulTextEditor() {
   const [fontSize, setFontSize] = useState(14);
   const [wordWrap, setWordWrap] = useState(true);
   const [minimap, setMinimap] = useState(false);
-  const [status, setStatus] = useState("");
   const [showHelp, setShowHelp] = useState(false);
 
   const words = value.trim() ? value.trim().split(/\s+/).length : 0;
@@ -29,18 +29,15 @@ function PowerfulTextEditor() {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(value);
-      setStatus("Copied editor content to clipboard.");
-      setTimeout(() => setStatus(""), 2000);
+      toast.success("Copied editor content to clipboard.");
     } catch {
-      setStatus("Copy failed. Please try again.");
-      setTimeout(() => setStatus(""), 2000);
+      toast.error("Copy failed. Please try again.");
     }
   };
 
   const handleReset = () => {
     setValue(starterText);
-    setStatus("Content reset to starter text.");
-    setTimeout(() => setStatus(""), 2000);
+    toast.success("Content reset to starter text.");
   };
 
   return (
@@ -194,7 +191,6 @@ function PowerfulTextEditor() {
         <span>Lines: {lines}</span>
         <span>Words: {words}</span>
         <span>Characters: {characters}</span>
-        {status && <span className="text-blue-600 font-medium">{status}</span>}
       </div>
     </div>
   );

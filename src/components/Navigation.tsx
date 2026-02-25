@@ -20,8 +20,8 @@ function Navigation({ isOpen, onToggle }: NavigationProps) {
   
   const navItems = [
     { path: '/', label: 'Home', icon: House },
-    { path: '/files', label: 'File List', icon: FolderOpen },
-    { path: '/files-advanced', label: 'File List Advanced', icon: Search },
+    { path: '/files', label: 'File Lister', icon: FolderOpen },
+    { path: '/files-advanced', label: 'Multiple File Opener', icon: Search },
     { path: '/file-copy', label: 'Copy File', icon: Copy },
     { path: '/text-editor', label: 'Powerful Text Editor', icon: FilePenLine }
   ]

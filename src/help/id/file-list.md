@@ -1,16 +1,20 @@
-# File List
+# File Lister
 
 ## Tentang fitur ini
-Fitur ini menampilkan isi folder yang Anda pilih. Hasilnya bisa langsung disalin.
+Fitur ini menampilkan isi folder yang Anda pilih, dengan opsi pencarian sampai subfolder terdalam (recursive).
+Hasilnya bisa disalin.
 
 ## Yang perlu diisi
 - **Folder Path**: alamat folder lengkap, misalnya `C:\\Users\\Name\\Documents`.
+- **Search deeper into subfolders (recursive)**: centang jika ingin ikut mencari ke folder di dalam folder.
+- **Copy Format**: pilih **Numbered + type + name**, **Name only**, atau **Full path**.
 
 ## Cara pakai
 1. Isi alamat folder.
+2. Opsional: centang recursive jika file mungkin berada di dalam subfolder.
 2. Klik **List Files**.
 3. Lihat daftar file dan folder yang muncul.
-4. Klik **Copy List** jika ingin menyalin daftar.
+4. Pilih format salin, lalu klik **Copy List**.
 
 ## Catatan
 - Ukuran hanya tampil untuk file.

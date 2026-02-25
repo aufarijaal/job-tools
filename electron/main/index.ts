@@ -110,6 +110,46 @@ app.on('activate', () => {
   }
 })
 
+function getDirectoryEntries(folderPath: string, recursive: boolean) {
+  const entries: Array<{ fullPath: string; relativePath: string; stats: fs.Stats }> = []
+
+  if (!recursive) {
+    const files = fs.readdirSync(folderPath)
+    files.forEach((file) => {
+      const fullPath = path.join(folderPath, file)
+      const stats = fs.statSync(fullPath)
+      entries.push({
+        fullPath,
+        relativePath: file,
+        stats,
+      })
+    })
+    return entries
+  }
+
+  const walk = (currentPath: string) => {
+    const currentEntries = fs.readdirSync(currentPath)
+    currentEntries.forEach((entryName) => {
+      const entryPath = path.join(currentPath, entryName)
+      const stats = fs.statSync(entryPath)
+      const relativePath = path.relative(folderPath, entryPath)
+
+      entries.push({
+        fullPath: entryPath,
+        relativePath,
+        stats,
+      })
+
+      if (stats.isDirectory()) {
+        walk(entryPath)
+      }
+    })
+  }
+
+  walk(folderPath)
+  return entries
+}
+
 // New window example arg: new windows url
 ipcMain.handle('open-win', (_, arg) => {
   const childWindow = new BrowserWindow({
@@ -128,8 +168,11 @@ ipcMain.handle('open-win', (_, arg) => {
 })
 
 // List files in a folder
-ipcMain.handle('list', (_, folderPath) => {
+ipcMain.handle('list', (_, payload) => {
   try {
+    const folderPath = typeof payload === 'string' ? payload : payload?.folderPath
+    const recursive = Boolean(typeof payload === 'object' && payload?.recursive)
+
     if (!folderPath) {
       console.error('No folder path provided')
       return { error: 'No folder path provided' }
@@ -147,18 +190,15 @@ ipcMain.handle('list', (_, folderPath) => {
       return { error: 'Path is not a directory' }
     }
 
-    // Read the directory
-    const files = fs.readdirSync(folderPath)
-    
-    // Get file details
-    const fileDetails = files.map(file => {
-      const fullPath = path.join(folderPath, file)
-      const fileStats = fs.statSync(fullPath)
+    const entries = getDirectoryEntries(folderPath, recursive)
+
+    const fileDetails = entries.map(({ fullPath, relativePath, stats }) => {
       return {
-        name: file,
-        type: fileStats.isDirectory() ? 'directory' : 'file',
-        size: fileStats.size,
-        modified: fileStats.mtime
+        name: relativePath,
+        path: fullPath,
+        type: stats.isDirectory() ? 'directory' : 'file',
+        size: stats.size,
+        modified: stats.mtime
       }
     })
     
@@ -171,8 +211,17 @@ ipcMain.handle('list', (_, folderPath) => {
 })
 
 // Search for specific files in a directory
-ipcMain.handle('search-files', (_, { fileNames, searchPath }) => {
+ipcMain.handle('search-files', (_, payload) => {
   try {
+    const fileNames = payload?.fileNames
+    const searchPath = payload?.searchPath
+    const recursive = Boolean(payload?.recursive)
+    const rawSearchMode = payload?.searchMode
+    const searchMode: 'contains' | 'startsWith' | 'endsWith' =
+      rawSearchMode === 'startsWith' || rawSearchMode === 'endsWith' || rawSearchMode === 'contains'
+        ? rawSearchMode
+        : 'contains'
+
     if (!fileNames || !Array.isArray(fileNames) || fileNames.length === 0) {
       return { error: 'No file names provided' }
     }
@@ -193,8 +242,24 @@ ipcMain.handle('search-files', (_, { fileNames, searchPath }) => {
     const found: Array<{ name: string; path: string; size: number; type: string; matchedSearch: string }> = []
     const notFound: string[] = []
 
-    // Get all files in the directory once
-    const allFiles = fs.readdirSync(searchPath)
+    const entries = getDirectoryEntries(searchPath, recursive).map(({ fullPath, relativePath, stats }) => ({
+      fullPath,
+      relativePath,
+      name: path.basename(relativePath),
+      stats,
+    }))
+
+    const matchByMode = (target: string, query: string) => {
+      if (searchMode === 'startsWith') {
+        return target.startsWith(query)
+      }
+
+      if (searchMode === 'endsWith') {
+        return target.endsWith(query)
+      }
+
+      return target.includes(query)
+    }
 
     // Search for each file
     fileNames.forEach(fileName => {
@@ -208,7 +273,7 @@ ipcMain.handle('search-files', (_, { fileNames, searchPath }) => {
       if (fs.existsSync(fullPath)) {
         const fileStats = fs.statSync(fullPath)
         found.push({
-          name: trimmedName,
+          name: path.relative(searchPath, fullPath),
           path: fullPath,
           size: fileStats.size,
           type: fileStats.isDirectory() ? 'directory' : 'file',
@@ -218,26 +283,23 @@ ipcMain.handle('search-files', (_, { fileNames, searchPath }) => {
       } else {
         // If no exact match, search for files with the same base name (without extension)
         const searchNameLower = trimmedName.toLowerCase()
-        const matches = allFiles.filter(file => {
-          const fileNameWithoutExt = path.parse(file).name.toLowerCase()
-          const fileLower = file.toLowerCase()
-          // Match if: 
-          // 1. File name without extension matches search term
-          // 2. File name starts with search term
-          return fileNameWithoutExt === searchNameLower || 
-                 fileLower.startsWith(searchNameLower + '.') ||
-                 fileLower === searchNameLower
+        const matches = entries.filter(entry => {
+          const fileNameWithoutExt = path.parse(entry.name).name.toLowerCase()
+          const fileLower = entry.name.toLowerCase()
+
+          return (
+            matchByMode(fileNameWithoutExt, searchNameLower) ||
+            matchByMode(fileLower, searchNameLower)
+          )
         })
 
         if (matches.length > 0) {
-          matches.forEach(matchedFile => {
-            const matchedFullPath = path.join(searchPath, matchedFile)
-            const fileStats = fs.statSync(matchedFullPath)
+          matches.forEach(matched => {
             found.push({
-              name: matchedFile,
-              path: matchedFullPath,
-              size: fileStats.size,
-              type: fileStats.isDirectory() ? 'directory' : 'file',
+              name: matched.relativePath,
+              path: matched.fullPath,
+              size: matched.stats.size,
+              type: matched.stats.isDirectory() ? 'directory' : 'file',
               matchedSearch: trimmedName
             })
           })
@@ -265,10 +327,19 @@ ipcMain.handle('search-files', (_, { fileNames, searchPath }) => {
 })
 
 // Open files with default application
-ipcMain.handle('open-files', (_, filePaths: string[]) => {
+ipcMain.handle('open-files', async (_, payload) => {
   try {
+    const filePaths = Array.isArray(payload) ? payload : payload?.filePaths
+    const maxOpenCount = typeof payload?.maxOpenCount === 'number' ? payload.maxOpenCount : undefined
+
     if (!filePaths || !Array.isArray(filePaths) || filePaths.length === 0) {
       return { error: 'No file paths provided' }
+    }
+
+    if (maxOpenCount && filePaths.length > maxOpenCount) {
+      return {
+        error: `You can only open up to ${maxOpenCount} files at once. Opening too many files may slow down or hang your PC.`,
+      }
     }
 
     const results = {
@@ -276,21 +347,26 @@ ipcMain.handle('open-files', (_, filePaths: string[]) => {
       failed: [] as { path: string; reason: string }[]
     }
 
-    filePaths.forEach(filePath => {
+    for (const filePath of filePaths) {
       try {
         if (!fs.existsSync(filePath)) {
           results.failed.push({ path: filePath, reason: 'File not found' })
-          return
+          continue
         }
 
         // Open file with default application
-        shell.openPath(filePath)
+        const openError = await shell.openPath(filePath)
+        if (openError) {
+          results.failed.push({ path: filePath, reason: openError })
+          continue
+        }
+
         results.opened.push(filePath)
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         results.failed.push({ path: filePath, reason: errorMessage })
       }
-    })
+    }
 
     return {
       success: results.opened.length > 0,

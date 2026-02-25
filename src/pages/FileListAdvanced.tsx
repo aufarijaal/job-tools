@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import {
   Check,
   Copy,
@@ -30,46 +31,72 @@ interface SearchResult {
   error?: string
 }
 
+type SearchMode = 'contains' | 'startsWith' | 'endsWith'
+type FoundCopyFormat = 'numbered' | 'nameOnly' | 'fullPath'
+
 function FileListAdvanced() {
   const [fileNames, setFileNames] = useState('')
   const [searchPath, setSearchPath] = useState('')
+  const [recursiveSearch, setRecursiveSearch] = useState(false)
+  const [searchMode, setSearchMode] = useState<SearchMode>('contains')
+  const [foundCopyFormat, setFoundCopyFormat] = useState<FoundCopyFormat>('numbered')
   const [result, setResult] = useState<SearchResult | null>(null)
-  const [error, setError] = useState('')
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [openingFiles, setOpeningFiles] = useState(false)
   const [copySuccess, setCopySuccess] = useState<'found' | 'notfound' | 'all' | null>(null)
+  const maxOpenLimit = 10
+
+  const openableFoundFiles = (result?.found ?? []).filter((file) => file.type === 'file')
+  const allOpenablePaths = openableFoundFiles.map((file) => file.path)
+
+  const formatFoundFilesForCopy = (files: FoundFile[]) => {
+    if (foundCopyFormat === 'nameOnly') {
+      return files.map((file) => file.name).join('\n')
+    }
+
+    if (foundCopyFormat === 'fullPath') {
+      return files.map((file) => file.path).join('\n')
+    }
+
+    return files
+      .map((file, index) => `${index + 1}. [${file.type.toUpperCase()}] ${file.name}`)
+      .join('\n')
+  }
 
   const handleSearch = async () => {
     if (!fileNames.trim()) {
-      setError('Please enter file names')
+      toast.error('Please enter file names')
       return
     }
 
     if (!searchPath.trim()) {
-      setError('Please enter a search path')
+      toast.error('Please enter a search path')
       return
     }
 
     setLoading(true)
-    setError('')
     setResult(null)
+    setSelectedPaths([])
 
     try {
       const fileList = fileNames.split('\n').filter(name => name.trim())
       
       const searchResult = await window.ipcRenderer.invoke('search-files', {
         fileNames: fileList,
-        searchPath: searchPath.trim()
+        searchPath: searchPath.trim(),
+        recursive: recursiveSearch,
+        searchMode,
       })
 
       if (searchResult.error) {
-        setError(searchResult.error)
+        toast.error(searchResult.error)
       } else {
         setResult(searchResult)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
-      setError(`Error: ${errorMessage}`)
+      toast.error(`Error: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -83,9 +110,7 @@ function FileListAdvanced() {
 
       if (type === 'found' || type === 'all') {
         text += `=== FOUND FILES (${result.foundCount}) ===\n`
-        result.found.forEach((file, index) => {
-          text += `${index + 1}. [${file.type.toUpperCase()}] ${file.name}\n`
-        })
+        text += `${formatFoundFilesForCopy(result.found)}\n`
       }
 
       if (type === 'all' && result.notFound.length > 0) {
@@ -100,32 +125,62 @@ function FileListAdvanced() {
       }
 
       await navigator.clipboard.writeText(text)
+      toast.success('Copied to clipboard')
       setCopySuccess(type)
       setTimeout(() => setCopySuccess(null), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
-      setError('Failed to copy to clipboard')
+      toast.error('Failed to copy to clipboard')
     }
   }
 
-  const handleOpenFiles = async () => {
-    if (!result || result.found.length === 0) return
+  const toggleSelection = (filePath: string) => {
+    setSelectedPaths((current) =>
+      current.includes(filePath)
+        ? current.filter((path) => path !== filePath)
+        : [...current, filePath]
+    )
+  }
+
+  const handleSelectAllToggle = () => {
+    if (selectedPaths.length === allOpenablePaths.length) {
+      setSelectedPaths([])
+      return
+    }
+    setSelectedPaths(allOpenablePaths)
+  }
+
+  const handleOpenFiles = async (mode: 'all' | 'selected') => {
+    if (!result || allOpenablePaths.length === 0) return
+
+    const filePaths = mode === 'all' ? allOpenablePaths : selectedPaths
+    if (filePaths.length === 0) {
+      toast.error(mode === 'selected' ? 'No files selected to open' : 'No files found to open')
+      return
+    }
+
+    if (filePaths.length > maxOpenLimit) {
+      toast.error(`You can only open up to ${maxOpenLimit} files at once. Opening too many files may slow down or hang your PC.`)
+      return
+    }
 
     setOpeningFiles(true)
     try {
-      const filePaths = result.found.map(file => file.path)
-      const openResult = await window.ipcRenderer.invoke('open-files', filePaths)
+      const openResult = await window.ipcRenderer.invoke('open-files', {
+        filePaths,
+        maxOpenCount: maxOpenLimit,
+      })
 
       if (openResult.success) {
-        setError(`Successfully opened ${openResult.openedCount} file(s)${openResult.failedCount > 0 ? `. Failed to open ${openResult.failedCount}` : ''}`)
+        toast.success(`Successfully opened ${openResult.openedCount} file(s)${openResult.failedCount > 0 ? `. Failed to open ${openResult.failedCount}` : ''}`)
       } else if (openResult.error) {
-        setError(`Error: ${openResult.error}`)
+        toast.error(`Error: ${openResult.error}`)
       } else if (openResult.failedCount > 0) {
-        setError(`Failed to open ${openResult.failedCount} file(s): ${openResult.failed.map((f: {path: string; reason: string}) => f.reason).join(', ')}`)
+        toast.error(`Failed to open ${openResult.failedCount} file(s): ${openResult.failed.map((f: {path: string; reason: string}) => f.reason).join(', ')}`)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
-      setError(`Error opening files: ${errorMessage}`)
+      toast.error(`Error opening files: ${errorMessage}`)
     } finally {
       setOpeningFiles(false)
     }
@@ -133,9 +188,9 @@ function FileListAdvanced() {
 
   return (
     <div className="p-8 max-w-6xl">
-      <h1 className="text-4xl font-bold mb-4">File List Advanced</h1>
+      <h1 className="text-4xl font-bold mb-4">Multiple File Opener</h1>
       <p className="text-lg mb-6">
-        Enter file names (one per line) and specify a directory to search for them.
+        Enter file names (one per line) and specify a directory to search then you can open them.
         <br />
         <span className="text-sm text-gray-600 inline-flex items-center gap-1">
           <Lightbulb size={14} />
@@ -166,6 +221,55 @@ function FileListAdvanced() {
           />
         </div>
 
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">Search Mode:</label>
+          <div className="flex flex-wrap gap-4 text-sm px-1 py-2 border rounded">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="search-mode"
+                value="contains"
+                checked={searchMode === 'contains'}
+                onChange={(e) => setSearchMode(e.target.value as SearchMode)}
+                className="h-4 w-4"
+              />
+              Contains search
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="search-mode"
+                value="startsWith"
+                checked={searchMode === 'startsWith'}
+                onChange={(e) => setSearchMode(e.target.value as SearchMode)}
+                className="h-4 w-4"
+              />
+              Starts with search
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="search-mode"
+                value="endsWith"
+                checked={searchMode === 'endsWith'}
+                onChange={(e) => setSearchMode(e.target.value as SearchMode)}
+                className="h-4 w-4"
+              />
+              Ends with search
+            </label>
+          </div>
+        </div>
+
+<label className="flex items-center gap-2 mb-4 text-xs">
+          <input
+            type="checkbox"
+            checked={recursiveSearch}
+            onChange={(e) => setRecursiveSearch(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <div>Search deeper into subfolders (recursive)</div>
+        </label>
+
         <button
           onClick={handleSearch}
           disabled={loading}
@@ -174,12 +278,6 @@ function FileListAdvanced() {
           {loading ? 'Searching...' : 'Search Files'}
         </button>
       </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
 
       {result && (
         <div className="space-y-6">
@@ -221,19 +319,87 @@ function FileListAdvanced() {
                     {copySuccess === 'found' ? 'Copied!' : 'Copy Found'}
                   </button>
                   <button
-                    onClick={handleOpenFiles}
-                    disabled={openingFiles}
+                    onClick={() => handleOpenFiles('selected')}
+                    disabled={openingFiles || selectedPaths.length === 0}
                     className="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {openingFiles ? <LoaderCircle size={16} className="animate-spin" /> : <FolderOpen size={16} />}
+                    {openingFiles ? 'Opening...' : `Open Selected (${selectedPaths.length})`}
+                  </button>
+                  <button
+                    onClick={() => handleOpenFiles('all')}
+                    disabled={openingFiles || allOpenablePaths.length === 0}
+                    className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {openingFiles ? <LoaderCircle size={16} className="animate-spin" /> : <FolderOpen size={16} />}
                     {openingFiles ? 'Opening...' : 'Open All Files'}
                   </button>
                 </div>
               </div>
+              <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
+                You can open up to {maxOpenLimit} files at once. Opening too many files may slow down or hang your PC.
+              </div>
+              <div className="mb-3">
+                <div className="text-sm font-medium mb-2">Copy Found Format:</div>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="found-copy-format"
+                      value="numbered"
+                      checked={foundCopyFormat === 'numbered'}
+                      onChange={(e) => setFoundCopyFormat(e.target.value as FoundCopyFormat)}
+                      className="h-4 w-4"
+                    />
+                    Numbered + type + name
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="found-copy-format"
+                      value="nameOnly"
+                      checked={foundCopyFormat === 'nameOnly'}
+                      onChange={(e) => setFoundCopyFormat(e.target.value as FoundCopyFormat)}
+                      className="h-4 w-4"
+                    />
+                    Name only
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="found-copy-format"
+                      value="fullPath"
+                      checked={foundCopyFormat === 'fullPath'}
+                      onChange={(e) => setFoundCopyFormat(e.target.value as FoundCopyFormat)}
+                      className="h-4 w-4"
+                    />
+                    Full path
+                  </label>
+                </div>
+              </div>
+              {openableFoundFiles.length > 0 && (
+                <label className="inline-flex items-center gap-2 mb-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedPaths.length > 0 && selectedPaths.length === allOpenablePaths.length}
+                    onChange={handleSelectAllToggle}
+                    className="h-4 w-4"
+                  />
+                  Select all found files ({allOpenablePaths.length})
+                </label>
+              )}
               <ul className="space-y-2">
                 {result.found.map((file, index) => (
                   <li key={index} className="px-3 py-2 bg-green-50 rounded hover:bg-green-100 flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                      {file.type === 'file' && (
+                        <input
+                          type="checkbox"
+                          checked={selectedPaths.includes(file.path)}
+                          onChange={() => toggleSelection(file.path)}
+                          className="h-4 w-4"
+                        />
+                      )}
                       <span className="font-mono text-xs px-2 py-1 bg-green-200 rounded">
                         <span className="inline-flex items-center gap-1">
                           {file.type === 'directory' ? <Folder size={12} /> : <FileText size={12} />}

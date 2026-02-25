@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import {
   Lightbulb,
   LoaderCircle,
@@ -81,15 +82,15 @@ function FileCopy() {
 
   const handleCreatePlan = () => {
     if (!sourcePath.trim()) {
-      alert('Please enter source file path')
+      toast.error('Please enter source file path')
       return
     }
     if (!outputPath.trim()) {
-      alert('Please enter output directory path')
+      toast.error('Please enter output directory path')
       return
     }
     if (!outputNames.trim()) {
-      alert('Please enter output file names')
+      toast.error('Please enter output file names')
       return
     }
 
@@ -116,6 +117,7 @@ function FileCopy() {
     setPrefix('')
     setSuffix('')
     setCreateOutputPathIfMissing(false)
+    toast.success('Copy plan added to queue')
   }
 
   const handleDeletePlan = (planId: string) => {
@@ -194,7 +196,7 @@ function FileCopy() {
 
   const handleRunSinglePlan = async (plan: CopyPlan) => {
     if (isRunning) {
-      alert('A job is already running. Please wait for it to complete.')
+      toast.error('A job is already running. Please wait for it to complete.')
       return
     }
     setIsRunning(true)
@@ -207,13 +209,13 @@ function FileCopy() {
 
   const handleRunAllPlans = async () => {
     if (isRunning) {
-      alert('Jobs are already running.')
+      toast.error('Jobs are already running.')
       return
     }
     
     const pendingPlans = plans.filter(p => p.status === 'pending')
     if (pendingPlans.length === 0) {
-      alert('No pending plans to run.')
+      toast.error('No pending plans to run.')
       return
     }
 
@@ -225,9 +227,11 @@ function FileCopy() {
         await executePlan(plan)
       }
       addLog('batch', 'Batch execution completed', 'success')
+      toast.success('Batch execution completed')
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       addLog('batch', `Batch error: ${errorMessage}`, 'error')
+      toast.error(`Batch error: ${errorMessage}`)
     } finally {
       setIsRunning(false)
     }

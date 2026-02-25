@@ -1,43 +1,63 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Check, Copy, Folder, FileText } from 'lucide-react'
 
 interface FileDetail {
   name: string
+  path: string
   type: 'file' | 'directory'
   size: number
   modified: string
 }
 
+type CopyFormat = 'numbered' | 'nameOnly' | 'fullPath'
+
 function FileList() {
   const [folderPath, setFolderPath] = useState('')
   const [files, setFiles] = useState<FileDetail[]>([])
-  const [error, setError] = useState('')
+  const [recursiveSearch, setRecursiveSearch] = useState(false)
+  const [copyFormat, setCopyFormat] = useState<CopyFormat>('numbered')
   const [loading, setLoading] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
 
+  const formatFilesForCopy = (list: FileDetail[]) => {
+    if (copyFormat === 'nameOnly') {
+      return list.map((file) => file.name).join('\n')
+    }
+
+    if (copyFormat === 'fullPath') {
+      return list.map((file) => file.path).join('\n')
+    }
+
+    return list
+      .map((file, index) => `${index + 1}. [${file.type.toUpperCase()}] ${file.name}`)
+      .join('\n')
+  }
+
   const handleListFiles = async () => {
     if (!folderPath.trim()) {
-      setError('Please enter a folder path')
+      toast.error('Please enter a folder path')
       return
     }
 
     setLoading(true)
-    setError('')
     setFiles([])
 
     try {
-      // Call the IPC handler
-      const result = await window.ipcRenderer.invoke('list', folderPath)
+      const result = await window.ipcRenderer.invoke('list', {
+        folderPath: folderPath.trim(),
+        recursive: recursiveSearch,
+      })
       
       if (result.error) {
-        setError(result.error)
+        toast.error(result.error)
       } else if (result.success && result.files) {
         setFiles(result.files)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
-      setError(`Error: ${errorMessage}`)
+      toast.error(`Error: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -45,22 +65,21 @@ function FileList() {
 
   const handleCopyList = async () => {
     try {
-      const fileListText = files.map((file, index) => 
-        `${index + 1}. [${file.type.toUpperCase()}] ${file.name}`
-      ).join('\n')
+      const fileListText = formatFilesForCopy(files)
       
       await navigator.clipboard.writeText(fileListText)
+      toast.success('File list copied to clipboard')
       setCopySuccess(true)
       setTimeout(() => setCopySuccess(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
-      setError('Failed to copy to clipboard')
+      toast.error('Failed to copy to clipboard')
     }
   }
 
   return (
     <div className="p-8 max-w-4xl">
-      <h1 className="text-4xl font-bold mb-4">File List Demo</h1>
+      <h1 className="text-4xl font-bold mb-4">File Lister</h1>
       <p className="text-lg mb-6">
         Enter a folder path to list its contents. You can copy the list to your clipboard.
       </p>
@@ -77,6 +96,16 @@ function FileList() {
           />
         </div>
 
+        <label className="flex items-center gap-2 mb-4 text-xs">
+          <input
+            type="checkbox"
+            checked={recursiveSearch}
+            onChange={(e) => setRecursiveSearch(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <div>Search deeper into subfolders (recursive)</div>
+        </label>
+
         <button
           onClick={handleListFiles}
           disabled={loading}
@@ -85,12 +114,6 @@ function FileList() {
           {loading ? 'Loading...' : 'List Files'}
         </button>
       </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
 
       {files.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
@@ -103,6 +126,44 @@ function FileList() {
               {copySuccess ? <Check size={16} /> : <Copy size={16} />}
               {copySuccess ? 'Copied!' : 'Copy List'}
             </button>
+          </div>
+          <div className="mb-3">
+            <div className="text-sm font-medium mb-2">Copy Format:</div>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="file-lister-copy-format"
+                  value="numbered"
+                  checked={copyFormat === 'numbered'}
+                  onChange={(e) => setCopyFormat(e.target.value as CopyFormat)}
+                  className="h-4 w-4"
+                />
+                Numbered + type + name
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="file-lister-copy-format"
+                  value="nameOnly"
+                  checked={copyFormat === 'nameOnly'}
+                  onChange={(e) => setCopyFormat(e.target.value as CopyFormat)}
+                  className="h-4 w-4"
+                />
+                Name only
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="file-lister-copy-format"
+                  value="fullPath"
+                  checked={copyFormat === 'fullPath'}
+                  onChange={(e) => setCopyFormat(e.target.value as CopyFormat)}
+                  className="h-4 w-4"
+                />
+                Full path
+              </label>
+            </div>
           </div>
           <ul className="space-y-2">
             {files.map((file, index) => (
