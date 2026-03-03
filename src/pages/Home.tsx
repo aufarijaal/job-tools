@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FolderOpen, Search, Copy, FilePenLine, CircleHelp, Zap, ArrowRight } from 'lucide-react'
+import { FolderOpen, Search, Copy, FilePenLine, ListTodo, CircleHelp, Zap, ArrowRight } from 'lucide-react'
 
 const features = [
   {
@@ -39,13 +39,22 @@ const features = [
     delay: '0.45s',
   },
   {
+    path: '/todo',
+    icon: ListTodo,
+    label: 'To-Do List',
+    description: 'Manage tasks with a persistent to-do list. Add, edit, check off, and clear tasks — all stored locally in SQLite.',
+    gradient: 'from-violet-500 to-purple-600',
+    glow: 'shadow-violet-500/30',
+    delay: '0.55s',
+  },
+  {
     path: '/help',
     icon: CircleHelp,
     label: 'Help / Bantuan',
     description: 'Bilingual documentation (English & Indonesian) for every feature. Quick reference for inputs, options, and usage tips.',
     gradient: 'from-pink-500 to-rose-500',
     glow: 'shadow-pink-500/30',
-    delay: '0.55s',
+    delay: '0.65s',
   },
 ]
 

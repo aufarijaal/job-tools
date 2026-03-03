@@ -6,14 +6,16 @@ import fileListEn from '../help/en/file-list.md?raw'
 import fileListAdvancedEn from '../help/en/file-list-advanced.md?raw'
 import fileCopyEn from '../help/en/file-copy.md?raw'
 import textEditorEn from '../help/en/text-editor.md?raw'
+import todoListEn from '../help/en/todo-list.md?raw'
 
 import fileListId from '../help/id/file-list.md?raw'
 import fileListAdvancedId from '../help/id/file-list-advanced.md?raw'
 import fileCopyId from '../help/id/file-copy.md?raw'
 import textEditorId from '../help/id/text-editor.md?raw'
+import todoListId from '../help/id/todo-list.md?raw'
 
 type Language = 'en' | 'id'
-type Topic = 'file-list' | 'file-list-advanced' | 'file-copy' | 'text-editor'
+type Topic = 'file-list' | 'file-list-advanced' | 'file-copy' | 'text-editor' | 'todo-list'
 
 const docs = {
   en: {
@@ -21,12 +23,14 @@ const docs = {
     'file-list-advanced': fileListAdvancedEn,
     'file-copy': fileCopyEn,
     'text-editor': textEditorEn,
+    'todo-list': todoListEn,
   },
   id: {
     'file-list': fileListId,
     'file-list-advanced': fileListAdvancedId,
     'file-copy': fileCopyId,
     'text-editor': textEditorId,
+    'todo-list': todoListId,
   },
 } as const
 
@@ -67,6 +71,7 @@ function Help() {
             <option value="file-list-advanced">Multiple File Opener</option>
             <option value="file-copy">Copy File</option>
             <option value="text-editor">Powerful Text Editor</option>
+            <option value="todo-list">To-Do List</option>
           </select>
         </div>
       </div>

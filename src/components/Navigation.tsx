@@ -5,6 +5,7 @@ import {
   Search,
   Copy,
   FilePenLine,
+  ListTodo,
   CircleHelp,
   ChevronLeft,
   ChevronRight,
@@ -23,7 +24,8 @@ function Navigation({ isOpen, onToggle }: NavigationProps) {
     { path: '/files', label: 'File Lister', icon: FolderOpen },
     { path: '/files-advanced', label: 'Multiple File Opener', icon: Search },
     { path: '/file-copy', label: 'Copy File', icon: Copy },
-    { path: '/text-editor', label: 'Powerful Text Editor', icon: FilePenLine }
+    { path: '/text-editor', label: 'Powerful Text Editor', icon: FilePenLine },
+    { path: '/todo', label: 'To-Do List', icon: ListTodo },
   ]
 
   const infoItems = [

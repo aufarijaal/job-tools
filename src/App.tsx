@@ -6,6 +6,7 @@ import FileList from './pages/FileList'
 import FileListAdvanced from './pages/FileListAdvanced'
 import FileCopy from './pages/FileCopy'
 import PowerfulTextEditor from './pages/PowerfulTextEditor'
+import TodoList from './pages/TodoList'
 import Help from './pages/Help'
 import NotFound from './pages/NotFound'
 
@@ -25,6 +26,7 @@ function App() {
             <Route path="/files-advanced" element={<FileListAdvanced />} />
             <Route path="/file-copy" element={<FileCopy />} />
             <Route path="/text-editor" element={<PowerfulTextEditor />} />
+            <Route path="/todo" element={<TodoList />} />
             <Route path="/help" element={<Help />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

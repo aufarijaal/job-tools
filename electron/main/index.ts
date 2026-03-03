@@ -37,6 +37,92 @@ if (process.platform === 'win32') app.setAppUserModelId(app.getName())
 
 app.setPath("userData", path.join(process.cwd(), "user-data"));
 
+// ── SQLite – Todo DB ──────────────────────────────────────────────────────────
+interface TodoRow {
+  id: number
+  text: string
+  done: number
+  created_at: string
+  updated_at: string
+}
+
+const Database = require('better-sqlite3')
+const dbDir = app.getPath('userData')
+fs.mkdirSync(dbDir, { recursive: true })
+const dbPath = path.join(dbDir, 'app.db')
+const db = new Database(dbPath)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS todos (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    text       TEXT    NOT NULL,
+    done       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL,
+    updated_at TEXT    NOT NULL
+  )
+`)
+
+// ── Todo IPC handlers ─────────────────────────────────────────────────────────
+ipcMain.handle('todo:getAll', () => {
+  try {
+    const rows = db.prepare('SELECT * FROM todos ORDER BY created_at DESC').all() as TodoRow[]
+    return { success: true, todos: rows.map(r => ({ ...r, done: Boolean(r.done) })) }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('todo:add', (_, text: string) => {
+  try {
+    const now = new Date().toISOString()
+    const stmt = db.prepare('INSERT INTO todos (text, done, created_at, updated_at) VALUES (?, 0, ?, ?)')
+    const info = stmt.run(text.trim(), now, now)
+    return { success: true, id: info.lastInsertRowid }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('todo:toggle', (_, id: number) => {
+  try {
+    const row = db.prepare('SELECT done FROM todos WHERE id = ?').get(id) as TodoRow | undefined
+    if (!row) return { error: 'Todo not found' }
+    const newDone = row.done ? 0 : 1
+    db.prepare('UPDATE todos SET done = ?, updated_at = ? WHERE id = ?').run(newDone, new Date().toISOString(), id)
+    return { success: true, done: Boolean(newDone) }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('todo:update', (_, id: number, text: string) => {
+  try {
+    db.prepare('UPDATE todos SET text = ?, updated_at = ? WHERE id = ?').run(text.trim(), new Date().toISOString(), id)
+    return { success: true }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('todo:delete', (_, id: number) => {
+  try {
+    db.prepare('DELETE FROM todos WHERE id = ?').run(id)
+    return { success: true }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('todo:clearDone', () => {
+  try {
+    const info = db.prepare('DELETE FROM todos WHERE done = 1').run()
+    return { success: true, deleted: info.changes }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+// ─────────────────────────────────────────────────────────────────────────────
+
 if (!app.requestSingleInstanceLock()) {
   app.quit()
   process.exit(0)

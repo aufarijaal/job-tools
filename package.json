@@ -1,6 +1,6 @@
 {
   "name": "job-tools",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "main": "dist-electron/main/index.js",
   "description": "Job Tools",
   "license": "MIT",
@@ -16,11 +16,13 @@
     "build": "tsc && vite build && electron-builder --win portable",
     "preview": "vite preview",
     "pretest": "vite build --mode=test",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "@monaco-editor/react": "^4.7.0",
+    "better-sqlite3": "^12.6.2",
     "electron-updater": "^6.3.9",
     "lucide-react": "^0.575.0",
     "monaco-editor": "^0.55.1",
@@ -30,8 +32,10 @@
     "sonner": "^2.0.7"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
     "@playwright/test": "^1.48.2",
     "@tailwindcss/typography": "^0.5.19",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
