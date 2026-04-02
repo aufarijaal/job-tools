@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Editor, { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import { toast } from "sonner";
+import { Maximize2, Minimize2 } from "lucide-react";
+import { useEditorFullscreen } from "../context/fullscreen";
 
 loader.config({ monaco });
 
@@ -21,6 +23,15 @@ function PowerfulTextEditor() {
   const [wordWrap, setWordWrap] = useState(true);
   const [minimap, setMinimap] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const { isEditorFullscreen: isFullscreen, setIsEditorFullscreen: setIsFullscreen } = useEditorFullscreen();
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isFullscreen]);
 
   const words = value.trim() ? value.trim().split(/\s+/).length : 0;
   const characters = value.length;
@@ -41,21 +52,26 @@ function PowerfulTextEditor() {
   };
 
   return (
-    <div className="p-8 max-w-7xl">
-      <h1 className="text-4xl font-bold mb-4">Powerful Text Editor</h1>
-      <p className="text-lg mb-6">
-        Write and organize plain text notes with a clean editing experience and
-        quick utilities.
-      </p>
+    <div className={isFullscreen ? "flex-1 flex flex-col" : "p-8 max-w-7xl"}>
+      {!isFullscreen && (
+        <>
+          <h1 className="text-4xl font-bold mb-4">Powerful Text Editor</h1>
+          <p className="text-lg mb-6">
+            Write and organize plain text notes with a clean editing experience and
+            quick utilities.
+          </p>
+        </>
+      )}
 
+      {!isFullscreen && (
       <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Theme</label>
             <select
               value={theme}
               onChange={(event) => setTheme(event.target.value as EditorTheme)}
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="vs-dark">Dark</option>
               <option value="light">Light</option>
@@ -72,35 +88,39 @@ function PowerfulTextEditor() {
               onChange={(event) =>
                 setFontSize(Number(event.target.value) || 14)
               }
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-24 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex items-end">
-            <label className="inline-flex items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                checked={wordWrap}
-                onChange={(event) => setWordWrap(event.target.checked)}
-                className="h-4 w-4"
-              />
-              Word Wrap
-            </label>
-          </div>
+          <label className="inline-flex items-center gap-2 text-sm font-medium pb-2">
+            <input
+              type="checkbox"
+              checked={wordWrap}
+              onChange={(event) => setWordWrap(event.target.checked)}
+              className="h-4 w-4"
+            />
+            Word Wrap
+          </label>
 
-          <div className="flex items-end">
-            <label className="inline-flex items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                checked={minimap}
-                onChange={(event) => setMinimap(event.target.checked)}
-                className="h-4 w-4"
-              />
-              Minimap
-            </label>
-          </div>
+          <label className="inline-flex items-center gap-2 text-sm font-medium pb-2">
+            <input
+              type="checkbox"
+              checked={minimap}
+              onChange={(event) => setMinimap(event.target.checked)}
+              className="h-4 w-4"
+            />
+            Minimap
+          </label>
 
-          <div className="flex items-end gap-2">
+          <div className="flex items-center gap-2 ml-auto pb-0.5">
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="bg-gray-200 text-gray-800 px-3 py-2 rounded hover:bg-gray-300 flex items-center gap-1 whitespace-nowrap"
+              title="Full screen"
+            >
+              <Maximize2 size={16} />
+              Full Screen
+            </button>
             <button
               onClick={() => setShowHelp(true)}
               className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600"
@@ -122,10 +142,23 @@ function PowerfulTextEditor() {
           </div>
         </div>
       </div>
+      )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className={`bg-white rounded-lg shadow overflow-hidden ${isFullscreen ? "flex-1 flex flex-col" : ""}`}>
+        {isFullscreen && (
+          <div className="flex justify-end px-3 py-2 bg-gray-50 border-b">
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded hover:bg-gray-300 flex items-center gap-1 text-sm"
+              title="Exit full screen"
+            >
+              <Minimize2 size={15} />
+              Exit Full Screen
+            </button>
+          </div>
+        )}
         <Editor
-          height="65vh"
+          height={isFullscreen ? "calc(100vh - 38px)" : "65vh"}
           language="plaintext"
           theme={theme}
           value={value}
@@ -187,11 +220,13 @@ function PowerfulTextEditor() {
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-700">
-        <span>Lines: {lines}</span>
-        <span>Words: {words}</span>
-        <span>Characters: {characters}</span>
-      </div>
+      {!isFullscreen && (
+        <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-700">
+          <span>Lines: {lines}</span>
+          <span>Words: {words}</span>
+          <span>Characters: {characters}</span>
+        </div>
+      )}
     </div>
   );
 }

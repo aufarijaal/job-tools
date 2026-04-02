@@ -4,6 +4,7 @@ import {
   FolderOpen,
   Search,
   Copy,
+  Files,
   FilePenLine,
   ListTodo,
   CircleHelp,
@@ -24,6 +25,7 @@ function Navigation({ isOpen, onToggle }: NavigationProps) {
     { path: '/files', label: 'File Lister', icon: FolderOpen },
     { path: '/files-advanced', label: 'Multiple File Opener', icon: Search },
     { path: '/file-copy', label: 'Copy File', icon: Copy },
+    { path: '/copy-files', label: 'Copy Files to a Folder', icon: Files },
     { path: '/text-editor', label: 'Powerful Text Editor', icon: FilePenLine },
     { path: '/todo', label: 'To-Do List', icon: ListTodo },
   ]

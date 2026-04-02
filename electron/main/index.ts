@@ -552,3 +552,61 @@ ipcMain.handle('copy-file-multiple', (_, { sourcePath, outputNames, outputPath, 
   }
 })
 
+// Copy a list of files (by full path) into a single destination folder
+ipcMain.handle('copy-files-to-destination', (_, { filePaths, destinationPath, createDestinationIfMissing = false }: {
+  filePaths: string[]
+  destinationPath: string
+  createDestinationIfMissing?: boolean
+}) => {
+  try {
+    if (!filePaths || !Array.isArray(filePaths) || filePaths.length === 0) {
+      return { error: 'No file paths provided' }
+    }
+
+    if (!destinationPath) {
+      return { error: 'No destination folder provided' }
+    }
+
+    if (!fs.existsSync(destinationPath)) {
+      if (createDestinationIfMissing) {
+        fs.mkdirSync(destinationPath, { recursive: true })
+      } else {
+        return { error: 'Destination folder does not exist' }
+      }
+    }
+
+    if (!fs.statSync(destinationPath).isDirectory()) {
+      return { error: 'Destination path is not a folder' }
+    }
+
+    const copied: Array<{ name: string; path: string }> = []
+    const failed: Array<{ name: string; reason: string }> = []
+
+    filePaths.forEach((srcPath) => {
+      const baseName = path.basename(srcPath)
+      const destFile = path.join(destinationPath, baseName)
+      try {
+        if (!fs.existsSync(srcPath)) {
+          failed.push({ name: baseName, reason: 'File no longer found' })
+          return
+        }
+        fs.copyFileSync(srcPath, destFile)
+        copied.push({ name: baseName, path: destFile })
+      } catch (err) {
+        failed.push({ name: baseName, reason: err instanceof Error ? err.message : String(err) })
+      }
+    })
+
+    return {
+      success: copied.length > 0,
+      copied,
+      failed,
+      copiedCount: copied.length,
+      failedCount: failed.length,
+      totalAttempted: filePaths.length,
+    }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
