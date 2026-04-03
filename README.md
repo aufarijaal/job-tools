@@ -1,91 +1,117 @@
-# electron-vite-react
+# Job Tools
 
-[![awesome-vite](https://awesome.re/mentioned-badge.svg)](https://github.com/vitejs/awesome-vite)
-![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/vite-react-electron?color=fa6470)
-![GitHub issues](https://img.shields.io/github/issues/caoxiemeihao/vite-react-electron?color=d8b22d)
-![GitHub license](https://img.shields.io/github/license/caoxiemeihao/vite-react-electron)
-[![Required Node.JS >= 14.18.0 || >=16.0.0](https://img.shields.io/static/v1?label=node&message=14.18.0%20||%20%3E=16.0.0&logo=node.js&color=3f893e)](https://nodejs.org/about/releases)
+A desktop productivity app for file management and text editing, built with Electron, React, and TypeScript.
 
-English | [简体中文](README.zh-CN.md)
+![Homepage screenshot](docs/screenshots/homepage.png)
 
-## 👀 Overview
+## Features
 
-📦 Ready out of the box  
-🎯 Based on the official [template-react-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts), project structure will be familiar to you  
-🌱 Easily extendable and customizable  
-💪 Supports Node.js API in the renderer process  
-🔩 Supports C/C++ native addons  
-🐞 Debugger configuration included  
-🖥 Easy to implement multiple windows  
+### File Lister
 
-## 🛫 Quick Setup
+Browse any folder and get a clean list of its contents. Copy file names in multiple formats — numbered, name only, or full path.
+
+![File Lister screenshot](docs/screenshots/file-lister.png)
+
+### Multiple File Opener
+
+Search files by name using contains, starts-with, or ends-with modes. Open multiple files at once with smart selection controls.
+
+![Multiple File Opener screenshot](docs/screenshots/multiple-file-opener.png)
+
+### Copy File
+
+Build a batch copy queue, pick your destination, and execute all copies in one click. Full progress feedback included.
+
+![Copy File screenshot](docs/screenshots/copy-file.png)
+
+### Copy Files to a Folder
+
+Search for files by name across a source folder, select the ones you need, and copy them all to a destination folder in one go.
+
+![Copy Files to a Folder screenshot](docs/screenshots/copy-files-to-folder.png)
+
+### Powerful Text Editor
+
+Full-featured Monaco-powered editor. Open, edit, and save any text file with syntax highlighting, theme switching, word wrap, and word/character/line counts.
+
+![Powerful Text Editor screenshot](docs/screenshots/text-editor.png)
+
+### To-Do List
+
+Persistent task list backed by SQLite. Add, edit, complete, and delete tasks — data survives app restarts.
+
+![To-Do List screenshot](docs/screenshots/todo-list.png)
+
+### Help
+
+Built-in bilingual help documentation (English / Indonesian).
+
+![Help screenshot](docs/screenshots/help.png)
+
+## Tech Stack
+
+- **Shell**: [Electron](https://www.electronjs.org/) 33
+- **Renderer**: [React](https://react.dev/) 18 + [TypeScript](https://www.typescriptlang.org/) 5
+- **Build tool**: [Vite](https://vitejs.dev/) 5
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) 3
+- **Editor**: [Monaco Editor](https://microsoft.github.io/monaco-editor/) via `@monaco-editor/react`
+- **Database**: [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) (local SQLite for To-Do List)
+- **Routing**: [React Router DOM](https://reactrouter.com/) 7
+- **Auto-update**: [electron-updater](https://www.electron.build/auto-update)
+- **Icons**: [lucide-react](https://lucide.dev/)
+- **Notifications**: [Sonner](https://sonner.emilkowal.ski/)
+- **Testing**: [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/)
+
+## Getting Started
 
 ```sh
-# clone the project
-git clone https://github.com/electron-vite/electron-vite-react.git
-
-# enter the project directory
-cd electron-vite-react
-
-# install dependency
+# Install dependencies
 npm install
 
-# develop
+# Start development server
 npm run dev
 ```
 
-## 🐞 Debug
+> **Note:** `better-sqlite3` is a native addon. The `postinstall` script runs `electron-rebuild` automatically after `npm install`.
 
-![electron-vite-react-debug.gif](/electron-vite-react-debug.gif)
+## Scripts
 
-## 📂 Directory structure
+| Command | Description |
+|---|---|
+| `npm run dev` | Start in development mode with hot reload |
+| `npm run build` | Compile TypeScript, bundle with Vite, then package with electron-builder |
+| `npm run preview` | Preview the Vite production build |
+| `npm test` | Run Vitest unit tests |
 
-Familiar React application structure, just with `electron` folder on the top :wink:  
-*Files in this folder will be separated from your React application and built into `dist-electron`*  
+## Building for Distribution
 
-```tree
-├── electron                                 Electron-related code
-│   ├── main                                 Main-process source code
-│   └── preload                              Preload-scripts source code
-│
-├── release                                  Generated after production build, contains executables
-│   └── {version}
-│       ├── {os}-{os_arch}                   Contains unpacked application executable
-│       └── {app_name}_{version}.{ext}       Installer for the application
-│
-├── public                                   Static assets
-└── src                                      Renderer source code, your React application
+```sh
+npm run build
 ```
 
-<!--
-## 🚨 Be aware
+Outputs are placed in `release/{version}/`. The build produces:
 
-This template integrates Node.js API to the renderer process by default. If you want to follow **Electron Security Concerns** you might want to disable this feature. You will have to expose needed API by yourself.  
+- **Windows**: NSIS installer (`x64`) and portable executable (`x64`)
+- **macOS**: DMG and ZIP
 
-To get started, remove the option as shown below. This will [modify the Vite configuration and disable this feature](https://github.com/electron-vite/vite-plugin-electron-renderer#config-presets-opinionated).
+## Directory Structure
 
-```diff
-# vite.config.ts
-
-export default {
-  plugins: [
-    ...
--   // Use Node.js API in the Renderer-process
--   renderer({
--     nodeIntegration: true,
--   }),
-    ...
-  ],
-}
 ```
--->
+├── electron/
+│   ├── main/          # Electron main-process source (IPC handlers, file system, SQLite)
+│   └── preload/       # Preload scripts (exposes IPC to renderer)
+│
+├── src/
+│   ├── pages/         # Feature pages (FileList, FileCopy, TextEditor, TodoList, …)
+│   ├── components/    # Shared UI components (Navigation)
+│   ├── context/       # React context (fullscreen state)
+│   └── help/          # Markdown help content (en/, id/)
+│
+├── public/            # Static assets (icons, images)
+├── release/           # Build output — generated by electron-builder
+└── test/              # Playwright e2e tests
+```
 
-## 🔧 Additional features
+## License
 
-1. electron-updater 👉 [see docs](src/components/update/README.md)
-1. playwright
-
-## ❔ FAQ
-
-- [C/C++ addons, Node.js modules - Pre-Bundling](https://github.com/electron-vite/vite-plugin-electron-renderer#dependency-pre-bundling)
-- [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies)
+MIT
