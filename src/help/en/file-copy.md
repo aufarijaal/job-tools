@@ -6,7 +6,7 @@ Copy File lets you create multiple copy plans and run them as a queue.
 ## Main concepts
 - **Plan**: one copy job configuration.
 - **Queue**: list of pending plans.
-- **Batch run**: execute all pending plans sequentially.
+- **Run All Plans**: run every pending plan one after another automatically.
 
 ## How to use
 1. Fill source file path and output directory.

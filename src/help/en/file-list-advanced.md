@@ -7,7 +7,7 @@ You can choose whether to search deeper into subfolders.
 ## Inputs
 - **File Names**: one keyword or name per line.
 - **Search Directory**: root folder used for search.
-- **Search Mode**: choose **Contains search**, **Starts with search**, or **Ends with search** using radio buttons.
+- **Search Mode**: choose **Contains search**, **Starts with search**, or **Ends with search**.
 - **Search deeper into subfolders (recursive)**: optional checkbox.
 - **Copy Found Format**: choose **Numbered + type + name**, **Name only**, or **Full path**.
 

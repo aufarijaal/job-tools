@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, Menu } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -33,7 +33,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration()
 
 // Set application name for Windows 10+ notifications
-if (process.platform === 'win32') app.setAppUserModelId(app.getName())
+if (process.platform === 'win32') app.setAppUserModelId('com.alwanstudio.jobtools')
 
 app.setPath("userData", path.join(process.cwd(), "user-data"));
 
@@ -135,7 +135,7 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html')
 async function createWindow() {
   win = new BrowserWindow({
     title: 'Main window',
-    icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
+    icon: path.join(process.env.VITE_PUBLIC, 'job-tools.png'),
     webPreferences: {
       preload,
       // Warning: Enable nodeIntegration and disable contextIsolation is not secure in production
@@ -166,7 +166,29 @@ async function createWindow() {
     return { action: 'deny' }
   })
 
-  win.menuBarVisible = false
+  // Native menubar – replaces the custom React sidebar
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'Menu',
+      submenu: [
+        { label: 'Home',                   click: () => win?.webContents.send('navigate', '/') },
+        { type: 'separator' },
+        { label: 'File Lister',            click: () => win?.webContents.send('navigate', '/files') },
+        { label: 'Multiple File Opener',   click: () => win?.webContents.send('navigate', '/files-advanced') },
+        { label: 'Copy File',              click: () => win?.webContents.send('navigate', '/file-copy') },
+        { label: 'Copy Files to a Folder', click: () => win?.webContents.send('navigate', '/copy-files') },
+        { label: 'Powerful Text Editor',   click: () => win?.webContents.send('navigate', '/text-editor') },
+        { label: 'To-Do List',             click: () => win?.webContents.send('navigate', '/todo') },
+      ],
+    },
+    {
+      label: 'Help',
+      submenu: [
+        { label: 'Documentation', click: () => win?.webContents.send('navigate', '/help') },
+      ],
+    },
+  ])
+  Menu.setApplicationMenu(menu)
 
   // Auto update
   update(win)

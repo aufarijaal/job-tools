@@ -21,4 +21,4 @@ Cocok untuk catatan, draft, atau daftar kerja harian.
 4. Gunakan **Reset** jika ingin kembali ke teks awal.
 
 ## Catatan
-- Editor ini khusus untuk teks biasa, bukan untuk memilih bahasa pemrograman.
+- Editor ini hanya untuk teks biasa. Tidak digunakan untuk menulis atau mengedit kode program.

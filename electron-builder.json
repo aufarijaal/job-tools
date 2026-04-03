@@ -16,6 +16,7 @@
       "zip"
     ]
   },
+  "icon": "public/job-tools.png",
   "win": {
     "target": [
       {

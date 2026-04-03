@@ -1,7 +1,7 @@
 # File Lister
 
 ## Tentang fitur ini
-Fitur ini menampilkan isi folder yang Anda pilih, dengan opsi pencarian sampai subfolder terdalam (recursive).
+Fitur ini menampilkan isi folder yang Anda pilih, termasuk opsi untuk mencari sampai ke folder-folder di dalamnya.
 Hasilnya bisa disalin.
 
 ## Yang perlu diisi

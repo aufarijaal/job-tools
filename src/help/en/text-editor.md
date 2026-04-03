@@ -21,4 +21,4 @@ Powerful Text Editor is a plain-text workspace for writing notes, drafts, and st
 5. Open **Help** to learn editor shortcuts.
 
 ## Notes
-- This editor is configured for plain text, not code language switching.
+- This is a plain text editor. It is not meant for writing or editing program code.

@@ -1,5 +1,9 @@
 import { useState } from 'react'
+import Editor, { loader } from '@monaco-editor/react'
+import * as monaco from 'monaco-editor'
 import { toast } from 'sonner'
+
+loader.config({ monaco })
 import {
   LoaderCircle,
   FolderSearch,
@@ -182,13 +186,27 @@ function MultiFileCopy() {
             <label className="block text-sm font-medium mb-1">
               File names to search for <span className="text-gray-400 font-normal">(one per line)</span>
             </label>
-            <textarea
-              value={fileNames}
-              onChange={(e) => setFileNames(e.target.value)}
-              rows={4}
-              placeholder={"report.pdf\nbudget.xlsx\nphoto"}
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-            />
+            <div className="border rounded overflow-hidden" style={{ height: '120px' }}>
+              <Editor
+                height="120px"
+                language="plaintext"
+                theme="dark"
+                value={fileNames}
+                onChange={(val) => setFileNames(val ?? '')}
+                options={{
+                  minimap: { enabled: false },
+                  lineNumbers: 'on',
+                  wordWrap: 'off',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  fontSize: 13,
+                  padding: { top: 6, bottom: 6 },
+                  overviewRulerLanes: 0,
+                  folding: false,
+                  lineDecorationsWidth: 20,
+                }}
+              />
+            </div>
           </div>
 
           <div>

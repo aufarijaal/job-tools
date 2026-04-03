@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FolderOpen, Search, Copy, FilePenLine, ListTodo, CircleHelp, Zap, ArrowRight } from 'lucide-react'
+import { FolderOpen, Search, Copy, Files, FilePenLine, ListTodo, CircleHelp, Zap, ArrowRight } from 'lucide-react'
 
 const features = [
   {
@@ -30,13 +30,22 @@ const features = [
     delay: '0.35s',
   },
   {
+    path: '/copy-files',
+    icon: Files,
+    label: 'Copy Files to a Folder',
+    description: 'Search for files by name across a source folder, select the ones you need, and copy them all to a destination folder in one go.',
+    gradient: 'from-sky-500 to-blue-500',
+    glow: 'shadow-sky-500/30',
+    delay: '0.45s',
+  },
+  {
     path: '/text-editor',
     icon: FilePenLine,
     label: 'Powerful Text Editor',
     description: 'Full-featured Monaco-powered editor. Open, edit, and save any text file with syntax highlighting and formatting tools.',
     gradient: 'from-orange-500 to-amber-500',
     glow: 'shadow-orange-500/30',
-    delay: '0.45s',
+    delay: '0.55s',
   },
   {
     path: '/todo',
@@ -45,7 +54,7 @@ const features = [
     description: 'Manage tasks with a persistent to-do list. Add, edit, check off, and clear tasks — all stored locally in SQLite.',
     gradient: 'from-violet-500 to-purple-600',
     glow: 'shadow-violet-500/30',
-    delay: '0.55s',
+    delay: '0.65s',
   },
   {
     path: '/help',
@@ -54,7 +63,7 @@ const features = [
     description: 'Bilingual documentation (English & Indonesian) for every feature. Quick reference for inputs, options, and usage tips.',
     gradient: 'from-pink-500 to-rose-500',
     glow: 'shadow-pink-500/30',
-    delay: '0.65s',
+    delay: '0.75s',
   },
 ]
 
@@ -117,7 +126,7 @@ function Home() {
 
       {/* ── Feature Cards ── */}
       <div className="animate-fade-in mb-6" style={{ animationDelay: '0.3s' }}>
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-5">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-5">
           Features
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -129,7 +138,7 @@ function Home() {
                 to={f.path}
                 className={`group block animate-fade-in-up relative overflow-hidden
                             rounded-2xl border border-white/5
-                            bg-gray-800/60 backdrop-blur
+                            bg-gray-800
                             p-6 transition-all duration-300
                             hover:-translate-y-1.5 hover:shadow-2xl ${f.glow}
                             hover:border-white/10`}
@@ -150,7 +159,7 @@ function Home() {
                 <h3 className="text-white font-semibold text-lg mb-2 group-hover:text-white">
                   {f.label}
                 </h3>
-                <p className="text-gray-400 text-sm leading-relaxed">
+                <p className="text-gray-300 text-sm leading-relaxed">
                   {f.description}
                 </p>
 
@@ -169,7 +178,7 @@ function Home() {
       </div>
 
       {/* ── Footer badge ── */}
-      <div className="animate-fade-in text-center text-xs text-gray-600 mt-10 pb-4"
+      <div className="animate-fade-in text-center text-xs text-gray-500 mt-10 pb-4"
            style={{ animationDelay: '0.6s' }}>
         Built with Electron · React · Tailwind CSS
       </div>

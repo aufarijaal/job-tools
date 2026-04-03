@@ -8,7 +8,7 @@ Anda bisa memilih apakah pencarian masuk sampai subfolder terdalam atau tidak.
 ## Yang perlu diisi
 - **File Names**: isi daftar nama file, satu nama per baris.
 - **Search Directory**: folder tempat pencarian dimulai.
-- **Search Mode**: pilih **Contains search**, **Starts with search**, atau **Ends with search** dengan radio button.
+- **Search Mode**: pilih **Contains search**, **Starts with search**, atau **Ends with search**.
 - **Search deeper into subfolders (recursive)**: centang jika ingin ikut mencari ke subfolder.
 - **Copy Found Format**: pilih **Numbered + type + name**, **Name only**, atau **Full path**.
 

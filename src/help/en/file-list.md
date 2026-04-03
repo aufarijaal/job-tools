@@ -1,7 +1,7 @@
 # File Lister
 
 ## Purpose
-File Lister displays the contents of a folder path, with optional deep (recursive) scanning.
+File Lister displays the contents of a folder, and can also search inside subfolders.
 You can copy the result.
 
 ## Inputs
