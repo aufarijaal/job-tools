@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FolderOpen, Search, Copy, Files, FilePenLine, ListTodo, CircleHelp, Zap, ArrowRight } from 'lucide-react'
+import { FolderOpen, Search, Copy, Files, FilePenLine, ListTodo, FileSpreadsheet, CircleHelp, Zap, ArrowRight } from 'lucide-react'
 
 const features = [
   {
@@ -57,13 +57,22 @@ const features = [
     delay: '0.65s',
   },
   {
+    path: '/size-label',
+    icon: FileSpreadsheet,
+    label: 'Size Label Card Maker',
+    description: 'Upload an Excel order summary, review and sort your data, design card fields and layout, then export size label cards directly to PDF.',
+    gradient: 'from-green-500 to-emerald-600',
+    glow: 'shadow-green-500/30',
+    delay: '0.75s',
+  },
+  {
     path: '/help',
     icon: CircleHelp,
     label: 'Help / Bantuan',
     description: 'Bilingual documentation (English & Indonesian) for every feature. Quick reference for inputs, options, and usage tips.',
     gradient: 'from-pink-500 to-rose-500',
     glow: 'shadow-pink-500/30',
-    delay: '0.75s',
+    delay: '0.85s',
   },
 ]
 

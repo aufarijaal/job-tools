@@ -9,6 +9,7 @@ import fileCopyEn from '../help/en/file-copy.md?raw'
 import multiFileCopyEn from '../help/en/multi-file-copy.md?raw'
 import textEditorEn from '../help/en/text-editor.md?raw'
 import todoListEn from '../help/en/todo-list.md?raw'
+import sizeLabelEn from '../help/en/size-label.md?raw'
 
 import fileListId from '../help/id/file-list.md?raw'
 import fileListAdvancedId from '../help/id/file-list-advanced.md?raw'
@@ -16,9 +17,10 @@ import fileCopyId from '../help/id/file-copy.md?raw'
 import multiFileCopyId from '../help/id/multi-file-copy.md?raw'
 import textEditorId from '../help/id/text-editor.md?raw'
 import todoListId from '../help/id/todo-list.md?raw'
+import sizeLabelId from '../help/id/size-label.md?raw'
 
 type Language = 'en' | 'id'
-type Topic = 'file-list' | 'file-list-advanced' | 'file-copy' | 'multi-file-copy' | 'text-editor' | 'todo-list'
+type Topic = 'file-list' | 'file-list-advanced' | 'file-copy' | 'multi-file-copy' | 'text-editor' | 'todo-list' | 'size-label'
 
 const docs = {
   en: {
@@ -28,6 +30,7 @@ const docs = {
     'multi-file-copy': multiFileCopyEn,
     'text-editor': textEditorEn,
     'todo-list': todoListEn,
+    'size-label': sizeLabelEn,
   },
   id: {
     'file-list': fileListId,
@@ -36,6 +39,7 @@ const docs = {
     'multi-file-copy': multiFileCopyId,
     'text-editor': textEditorId,
     'todo-list': todoListId,
+    'size-label': sizeLabelId,
   },
 } as const
 
@@ -46,6 +50,7 @@ const topics: { id: Topic; label: string }[] = [
   { id: 'multi-file-copy',    label: 'Copy Files to a Folder' },
   { id: 'text-editor',        label: 'Powerful Text Editor' },
   { id: 'todo-list',          label: 'To-Do List' },
+  { id: 'size-label',         label: 'Size Label Card Maker' },
 ]
 
 function Help() {

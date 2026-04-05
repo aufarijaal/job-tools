@@ -8,6 +8,7 @@ import FileCopy from './pages/FileCopy'
 import MultiFileCopy from './pages/MultiFileCopy'
 import PowerfulTextEditor from './pages/PowerfulTextEditor'
 import TodoList from './pages/TodoList'
+import SizeLabelCardMaker from './pages/SizeLabelCardMaker'
 import Help from './pages/Help'
 import NotFound from './pages/NotFound'
 
@@ -33,6 +34,7 @@ function App() {
             <Route path="/copy-files" element={<MultiFileCopy />} />
             <Route path="/text-editor" element={<PowerfulTextEditor />} />
             <Route path="/todo" element={<TodoList />} />
+            <Route path="/size-label" element={<SizeLabelCardMaker />} />
             <Route path="/help" element={<Help />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

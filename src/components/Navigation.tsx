@@ -7,6 +7,7 @@ import {
   Files,
   FilePenLine,
   ListTodo,
+  FileSpreadsheet,
   CircleHelp,
   ChevronLeft,
   ChevronRight,
@@ -28,6 +29,7 @@ function Navigation({ isOpen, onToggle }: NavigationProps) {
     { path: '/copy-files', label: 'Copy Files to a Folder', icon: Files },
     { path: '/text-editor', label: 'Powerful Text Editor', icon: FilePenLine },
     { path: '/todo', label: 'To-Do List', icon: ListTodo },
+    { path: '/size-label', label: 'Size Label Card Maker', icon: FileSpreadsheet },
   ]
 
   const infoItems = [

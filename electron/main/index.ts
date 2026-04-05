@@ -179,6 +179,7 @@ async function createWindow() {
         { label: 'Copy Files to a Folder', click: () => win?.webContents.send('navigate', '/copy-files') },
         { label: 'Powerful Text Editor',   click: () => win?.webContents.send('navigate', '/text-editor') },
         { label: 'To-Do List',             click: () => win?.webContents.send('navigate', '/todo') },
+        { label: 'Size Label Card Maker',  click: () => win?.webContents.send('navigate', '/size-label') },
       ],
     },
     {
