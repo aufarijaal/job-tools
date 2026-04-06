@@ -11,6 +11,8 @@ import TodoList from './pages/TodoList'
 import SizeLabelCardMaker from './pages/SizeLabelCardMaker'
 import Help from './pages/Help'
 import NotFound from './pages/NotFound'
+import CartonViewer from './pages/CartonViewer'
+import CartonCatalog from './pages/CartonCatalog'
 
 function App() {
   const [isEditorFullscreen, setIsEditorFullscreen] = useState(false)
@@ -36,6 +38,8 @@ function App() {
             <Route path="/todo" element={<TodoList />} />
             <Route path="/size-label" element={<SizeLabelCardMaker />} />
             <Route path="/help" element={<Help />} />
+            <Route path="/carton-viewer" element={<CartonViewer />} />
+            <Route path="/carton-catalog" element={<CartonCatalog />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>

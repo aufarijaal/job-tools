@@ -10,6 +10,8 @@ import multiFileCopyEn from '../help/en/multi-file-copy.md?raw'
 import textEditorEn from '../help/en/text-editor.md?raw'
 import todoListEn from '../help/en/todo-list.md?raw'
 import sizeLabelEn from '../help/en/size-label.md?raw'
+import cartonCatalogEn from '../help/en/carton-catalog.md?raw'
+import cartonViewerEn from '../help/en/carton-viewer.md?raw'
 
 import fileListId from '../help/id/file-list.md?raw'
 import fileListAdvancedId from '../help/id/file-list-advanced.md?raw'
@@ -18,9 +20,11 @@ import multiFileCopyId from '../help/id/multi-file-copy.md?raw'
 import textEditorId from '../help/id/text-editor.md?raw'
 import todoListId from '../help/id/todo-list.md?raw'
 import sizeLabelId from '../help/id/size-label.md?raw'
+import cartonCatalogId from '../help/id/carton-catalog.md?raw'
+import cartonViewerId from '../help/id/carton-viewer.md?raw'
 
 type Language = 'en' | 'id'
-type Topic = 'file-list' | 'file-list-advanced' | 'file-copy' | 'multi-file-copy' | 'text-editor' | 'todo-list' | 'size-label'
+type Topic = 'file-list' | 'file-list-advanced' | 'file-copy' | 'multi-file-copy' | 'text-editor' | 'todo-list' | 'size-label' | 'carton-catalog' | 'carton-viewer'
 
 const docs = {
   en: {
@@ -31,6 +35,8 @@ const docs = {
     'text-editor': textEditorEn,
     'todo-list': todoListEn,
     'size-label': sizeLabelEn,
+    'carton-catalog': cartonCatalogEn,
+    'carton-viewer': cartonViewerEn,
   },
   id: {
     'file-list': fileListId,
@@ -40,6 +46,8 @@ const docs = {
     'text-editor': textEditorId,
     'todo-list': todoListId,
     'size-label': sizeLabelId,
+    'carton-catalog': cartonCatalogId,
+    'carton-viewer': cartonViewerId,
   },
 } as const
 
@@ -51,6 +59,8 @@ const topics: { id: Topic; label: string }[] = [
   { id: 'text-editor',        label: 'Powerful Text Editor' },
   { id: 'todo-list',          label: 'To-Do List' },
   { id: 'size-label',         label: 'Size Label Card Maker' },
+  { id: 'carton-catalog',     label: 'Carton Catalog' },
+  { id: 'carton-viewer',      label: 'Carton Viewer' },
 ]
 
 function Help() {

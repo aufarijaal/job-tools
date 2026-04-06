@@ -121,6 +121,82 @@ ipcMain.handle('todo:clearDone', () => {
     return { error: (err as Error).message }
   }
 })
+
+// ── SQLite – Carton Catalog ───────────────────────────────────────────────────
+interface CartonRow {
+  id: number
+  name: string
+  description: string
+  width: number
+  height: number
+  depth: number
+  created_at: string
+  updated_at: string
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cartons (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    description TEXT    NOT NULL DEFAULT '',
+    width       REAL    NOT NULL DEFAULT 1.6,
+    height      REAL    NOT NULL DEFAULT 2.0,
+    depth       REAL    NOT NULL DEFAULT 1.2,
+    created_at  TEXT    NOT NULL,
+    updated_at  TEXT    NOT NULL
+  )
+`)
+
+ipcMain.handle('carton:getAll', () => {
+  try {
+    const rows = db.prepare('SELECT * FROM cartons ORDER BY created_at DESC').all() as CartonRow[]
+    return { success: true, cartons: rows }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('carton:get', (_, id: number) => {
+  try {
+    const row = db.prepare('SELECT * FROM cartons WHERE id = ?').get(id) as CartonRow | undefined
+    if (!row) return { error: 'Not found' }
+    return { success: true, carton: row }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('carton:add', (_, data: Omit<CartonRow, 'id' | 'created_at' | 'updated_at'>) => {
+  try {
+    const now = new Date().toISOString()
+    const info = db.prepare(
+      'INSERT INTO cartons (name, description, width, height, depth, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(data.name.trim(), data.description.trim(), data.width, data.height, data.depth, now, now)
+    return { success: true, id: info.lastInsertRowid }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('carton:update', (_, id: number, data: Omit<CartonRow, 'id' | 'created_at' | 'updated_at'>) => {
+  try {
+    db.prepare(
+      'UPDATE cartons SET name = ?, description = ?, width = ?, height = ?, depth = ?, updated_at = ? WHERE id = ?'
+    ).run(data.name.trim(), data.description.trim(), data.width, data.height, data.depth, new Date().toISOString(), id)
+    return { success: true }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('carton:delete', (_, id: number) => {
+  try {
+    db.prepare('DELETE FROM cartons WHERE id = ?').run(id)
+    return { success: true }
+  } catch (err) {
+    return { error: (err as Error).message }
+  }
+})
 // ─────────────────────────────────────────────────────────────────────────────
 
 if (!app.requestSingleInstanceLock()) {
@@ -150,7 +226,7 @@ async function createWindow() {
   if (VITE_DEV_SERVER_URL) { // #298
     win.loadURL(VITE_DEV_SERVER_URL)
     // Open devTool if the app is not packaged
-    // win.webContents.openDevTools()
+    win.webContents.openDevTools()
   } else {
     win.loadFile(indexHtml)
   }
@@ -180,6 +256,8 @@ async function createWindow() {
         { label: 'Powerful Text Editor',   click: () => win?.webContents.send('navigate', '/text-editor') },
         { label: 'To-Do List',             click: () => win?.webContents.send('navigate', '/todo') },
         { label: 'Size Label Card Maker',  click: () => win?.webContents.send('navigate', '/size-label') },
+        { label: 'Carton Viewer',          click: () => win?.webContents.send('navigate', '/carton-viewer') },
+        { label: 'Carton Catalog',         click: () => win?.webContents.send('navigate', '/carton-catalog') },
       ],
     },
     {

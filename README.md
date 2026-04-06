@@ -42,6 +42,18 @@ Persistent task list backed by SQLite. Add, edit, complete, and delete tasks —
 
 ![To-Do List screenshot](docs/screenshots/todo-list.png)
 
+### Size Label Card Maker
+
+Upload an Excel order summary, review and sort the imported rows, design per-field card layout (font, size, alignment, prefix/suffix), then export print-ready size label cards directly to PDF.
+
+### Carton Catalog
+
+Maintain a named catalog of carton box sizes (W × H × D). Add entries manually or bulk-import from an Excel spreadsheet. Every entry gets an animated 3D preview. Open any carton in the interactive Carton Viewer for sticker placement.
+
+### Carton Viewer
+
+Interactive 3D carton viewer. Place, drag, and resize sticker labels (emoji or custom image) on any face of the box. Uses orbit controls for free rotation and zoom.
+
 ### Help
 
 Built-in bilingual help documentation (English / Indonesian).
@@ -57,6 +69,8 @@ Built-in bilingual help documentation (English / Indonesian).
 - **Editor**: [Monaco Editor](https://microsoft.github.io/monaco-editor/) via `@monaco-editor/react`
 - **Database**: [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) (local SQLite for To-Do List)
 - **Routing**: [React Router DOM](https://reactrouter.com/) 7
+- **3D rendering**: [Three.js](https://threejs.org/) + [`@react-three/fiber`](https://docs.pmnd.rs/react-three-fiber) + [`@react-three/drei`](https://github.com/pmndrs/drei)
+- **Excel I/O**: [xlsx](https://sheetjs.com/) (SheetJS)
 - **Auto-update**: [electron-updater](https://www.electron.build/auto-update)
 - **Icons**: [lucide-react](https://lucide.dev/)
 - **Notifications**: [Sonner](https://sonner.emilkowal.ski/)
