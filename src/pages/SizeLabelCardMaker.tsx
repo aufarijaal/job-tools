@@ -2,19 +2,23 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { read, utils } from 'xlsx'
 import { toast } from 'sonner'
+import JsBarcode from 'jsbarcode'
+import QRCode from 'qrcode'
 import {
   FileSpreadsheet, Upload, TableProperties, Palette,
   ChevronDown, X, Printer, Eye,
   GripVertical, ArrowUp, ArrowDown,
   Bold, AlignLeft, AlignCenter, AlignRight, Plus, Trash2,
+  BookmarkPlus, Pencil, Layers,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Step = 'upload' | 'data' | 'design'
+type LayoutStyle = 'vertical' | 'side-code-right' | 'size-grid'
 type SortDir = 'asc' | 'desc'
 interface SortRule { key: OutputCol; dir: SortDir }
-type RowData = Record<OutputCol, string> & { _poddTs: number }
+type RowData = Record<OutputCol, string> & { _poddTs: number; _sizePairs: Array<{size: string; qty: number}> }
 type FontSize = 'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl'
 type FontWeight = 'normal' | 'semibold' | 'bold'
 type TextAlign = 'left' | 'center' | 'right'
@@ -44,6 +48,10 @@ interface CardDesign {
   fontFamily: string
   showIndex: boolean
   showPageNumbers: boolean
+  showBarcode: boolean
+  barcodeType: 'barcode' | 'qr'
+  barcodeHeightMm: number
+  layoutStyle: LayoutStyle
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -54,9 +62,21 @@ const SIZE_COLS = [
   '11','11,5','12','12,5','13','13,5','14','14,5','15','16','17','18',
 ]
 
-// Also match period-decimal variants (in case locale differs)
-const SIZE_COLS_ALT: Record<string, string> = {}
-SIZE_COLS.forEach((c) => { SIZE_COLS_ALT[c.replace(',', '.')] = c })
+// Comprehensive lookup: any plausible header representation → canonical SIZE_COL
+// Handles: "1,5" (comma), "1.5" (period), number 1.5 → "1.5", "1.0" for integers, "  1  " (whitespace)
+const SIZE_COL_LOOKUP: Record<string, string> = {}
+SIZE_COLS.forEach((c) => {
+  SIZE_COL_LOOKUP[c] = c                                   // "1,5" → "1,5"
+  const withPeriod = c.replace(',', '.')
+  SIZE_COL_LOOKUP[withPeriod] = c                          // "1.5" → "1,5"
+  const num = parseFloat(withPeriod)
+  if (!isNaN(num)) {
+    SIZE_COL_LOOKUP[String(num)] = c                       // JS number .toString(): "1.5", "1"
+    if (Number.isInteger(num)) {
+      SIZE_COL_LOOKUP[num.toFixed(1)] = c                  // "1.0", "2.0" etc.
+    }
+  }
+})
 
 const OUTPUT_COLUMNS = [
   'FTY SAP#',
@@ -64,6 +84,7 @@ const OUTPUT_COLUMNS = [
   'Article Number',
   'Model Name',
   'PODD',
+  'Released Date',
   'TOTAL QTY',
   'Ship to Country',
   'Sizes',
@@ -90,19 +111,190 @@ const FONT_SIZE_LABELS: Record<FontSize, string> = {
 }
 
 const DEFAULT_FIELDS: CardField[] = [
-  { id: 'f0', columnKey: 'Model Name',         showLabel: false, label: '',        fontSize: '2xl', fontWeight: 'bold',     textAlign: 'center', italic: false, prefix: '', suffix: '' },
-  { id: 'f1', columnKey: 'FTY SAP#',           showLabel: true,  label: 'SAP',     fontSize: 'xl',  fontWeight: 'bold',     textAlign: 'center', italic: false, prefix: '', suffix: '' },
-  { id: 'f2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',     fontSize: 'xl',  fontWeight: 'bold',     textAlign: 'center', italic: false, prefix: '', suffix: '' },
-  { id: 'f3', columnKey: 'Article Number',     showLabel: true,  label: 'Art.',    fontSize: 'xs',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
-  { id: 'f4', columnKey: 'PODD',               showLabel: false, label: '',        fontSize: 'sm',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
-  { id: 'f5', columnKey: 'TOTAL QTY',          showLabel: false, label: '',        fontSize: 'sm',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
-  { id: 'f6', columnKey: 'Ship to Country',    showLabel: true,  label: 'Ship to', fontSize: 'xs',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
-  { id: 'f7', columnKey: 'Sizes',              showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'f0', columnKey: 'Model Name',         showLabel: false, label: '',           fontSize: '2xl', fontWeight: 'bold',     textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'f1', columnKey: 'FTY SAP#',           showLabel: true,  label: 'SAP',        fontSize: 'xl',  fontWeight: 'bold',     textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'f2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',        fontSize: 'xl',  fontWeight: 'bold',     textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'f3', columnKey: 'Article Number',     showLabel: true,  label: 'Art.',       fontSize: 'xs',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'f4', columnKey: 'PODD',               showLabel: false, label: '',           fontSize: 'sm',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'f8', columnKey: 'Released Date',      showLabel: false, label: '',           fontSize: 'xs',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'f5', columnKey: 'TOTAL QTY',          showLabel: false, label: '',           fontSize: 'sm',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'f6', columnKey: 'Ship to Country',    showLabel: true,  label: 'Ship to',    fontSize: 'xs',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'f7', columnKey: 'Sizes',              showLabel: false, label: '',           fontSize: 'xs',  fontWeight: 'normal',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
 ]
 
 const DEFAULT_SORT: SortRule[] = [
   { key: 'FTY SAP#', dir: 'asc' },
   { key: 'PODD',     dir: 'asc' },
+]
+
+// ─── Layout Presets ────────────────────────────────────────────────────────────
+
+const BOLD_FIELDS: CardField[] = [
+  { id: 'p1f0', columnKey: 'Model Name',         showLabel: false, label: '',        fontSize: '3xl', fontWeight: 'bold',   textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'p1f1', columnKey: 'FTY SAP#',           showLabel: true,  label: 'SAP',     fontSize: '2xl', fontWeight: 'bold',   textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'p1f2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',     fontSize: 'xl',  fontWeight: 'bold',   textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'p1f3', columnKey: 'PODD',               showLabel: false, label: '',        fontSize: 'sm',  fontWeight: 'normal', textAlign: 'center', italic: false, prefix: '', suffix: '' },
+]
+
+const COMPACT_FIELDS: CardField[] = [
+  { id: 'p2f0', columnKey: 'Model Name',         showLabel: false, label: '',        fontSize: 'lg',  fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p2f1', columnKey: 'FTY SAP#',           showLabel: true,  label: 'SAP',     fontSize: 'sm',  fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p2f2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',     fontSize: 'sm',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p2f3', columnKey: 'PODD',               showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p2f4', columnKey: 'TOTAL QTY',          showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+]
+
+const SIDE_QR_FIELDS: CardField[] = [
+  { id: 'p3f0', columnKey: 'Model Name',         showLabel: false, label: '',        fontSize: 'xl',  fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p3f1', columnKey: 'FTY SAP#',           showLabel: true,  label: 'SAP',     fontSize: 'sm',  fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p3f2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',     fontSize: 'sm',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p3f3', columnKey: 'PODD',               showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p3f4', columnKey: 'Ship to Country',    showLabel: true,  label: 'Ship',    fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p3f5', columnKey: 'Sizes',              showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+]
+
+const SAP_HERO_FIELDS: CardField[] = [
+  { id: 'ph0', columnKey: 'FTY SAP#',           showLabel: false, label: '',        fontSize: '3xl', fontWeight: 'bold',   textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'ph1', columnKey: 'Model Name',         showLabel: false, label: '',        fontSize: 'sm',  fontWeight: 'normal', textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'ph2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',     fontSize: 'xs',  fontWeight: 'normal', textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'ph3', columnKey: 'PODD',               showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'center', italic: false, prefix: '', suffix: '' },
+  { id: 'ph4', columnKey: 'TOTAL QTY',          showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'center', italic: false, prefix: '', suffix: '' },
+]
+
+const SAP_QR_FIELDS: CardField[] = [
+  { id: 'pq0', columnKey: 'FTY SAP#',           showLabel: false, label: '',        fontSize: '2xl', fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'pq1', columnKey: 'Model Name',         showLabel: false, label: '',        fontSize: 'sm',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'pq2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',     fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'pq3', columnKey: 'PODD',               showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'pq4', columnKey: 'TOTAL QTY',          showLabel: false, label: '',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+]
+
+const SIZE_BREAKDOWN_FIELDS: CardField[] = [
+  { id: 'sg0', columnKey: 'Model Name',         showLabel: false, label: '',           fontSize: 'lg',  fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'sg1', columnKey: 'FTY SAP#',           showLabel: true,  label: 'SAP',        fontSize: 'sm',  fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'sg2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',        fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'sg3', columnKey: 'Released Date',      showLabel: false, label: '',           fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'sg4', columnKey: 'TOTAL QTY',          showLabel: false, label: '',           fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+]
+
+const LABEL_FIELDS: CardField[] = [
+  { id: 'p4f0', columnKey: 'Model Name',         showLabel: false, label: '',        fontSize: 'xl',  fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p4f1', columnKey: 'FTY SAP#',           showLabel: true,  label: 'SAP',     fontSize: 'sm',  fontWeight: 'bold',   textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+  { id: 'p4f2', columnKey: 'Order Number (GTN)', showLabel: true,  label: 'GTN',     fontSize: 'xs',  fontWeight: 'normal', textAlign: 'left',   italic: false, prefix: '', suffix: '' },
+]
+
+interface LayoutPreset {
+  id: string
+  name: string
+  desc: string
+  design: Omit<CardDesign, 'showIndex' | 'showPageNumbers'>
+}
+
+const LAYOUT_PRESETS: LayoutPreset[] = [
+  {
+    id: 'classic',
+    name: 'Classic',
+    desc: 'All fields · linear barcode',
+    design: {
+      fields: DEFAULT_FIELDS,
+      cardWidthMm: 90, cardHeightMm: 55, paddingMm: 5,
+      bgColor: '#ffffff', borderColor: '#cccccc', borderWidthPx: 1,
+      fontFamily: 'system-ui, sans-serif',
+      showBarcode: true, barcodeType: 'barcode', barcodeHeightMm: 8,
+      layoutStyle: 'vertical',
+    },
+  },
+  {
+    id: 'bold',
+    name: 'Bold',
+    desc: 'Large model name · barcode',
+    design: {
+      fields: BOLD_FIELDS,
+      cardWidthMm: 90, cardHeightMm: 60, paddingMm: 5,
+      bgColor: '#ffffff', borderColor: '#333333', borderWidthPx: 2,
+      fontFamily: 'Arial, sans-serif',
+      showBarcode: true, barcodeType: 'barcode', barcodeHeightMm: 10,
+      layoutStyle: 'vertical',
+    },
+  },
+  {
+    id: 'compact',
+    name: 'Compact',
+    desc: 'Small card · no code',
+    design: {
+      fields: COMPACT_FIELDS,
+      cardWidthMm: 85, cardHeightMm: 40, paddingMm: 4,
+      bgColor: '#ffffff', borderColor: '#cccccc', borderWidthPx: 1,
+      fontFamily: 'system-ui, sans-serif',
+      showBarcode: false, barcodeType: 'barcode', barcodeHeightMm: 8,
+      layoutStyle: 'vertical',
+    },
+  },
+  {
+    id: 'side-qr',
+    name: 'Side QR',
+    desc: 'Text left · QR right',
+    design: {
+      fields: SIDE_QR_FIELDS,
+      cardWidthMm: 90, cardHeightMm: 55, paddingMm: 4,
+      bgColor: '#ffffff', borderColor: '#cccccc', borderWidthPx: 1,
+      fontFamily: 'system-ui, sans-serif',
+      showBarcode: true, barcodeType: 'qr', barcodeHeightMm: 28,
+      layoutStyle: 'side-code-right',
+    },
+  },
+  {
+    id: 'label',
+    name: 'Wide Label',
+    desc: 'Wide strip · big barcode',
+    design: {
+      fields: LABEL_FIELDS,
+      cardWidthMm: 110, cardHeightMm: 38, paddingMm: 4,
+      bgColor: '#ffffff', borderColor: '#aaaaaa', borderWidthPx: 1,
+      fontFamily: 'Arial, sans-serif',
+      showBarcode: true, barcodeType: 'barcode', barcodeHeightMm: 12,
+      layoutStyle: 'vertical',
+    },
+  },
+  {
+    id: 'sap-hero',
+    name: 'SAP Hero',
+    desc: 'Giant SAP# · centered · barcode',
+    design: {
+      fields: SAP_HERO_FIELDS,
+      cardWidthMm: 90, cardHeightMm: 55, paddingMm: 5,
+      bgColor: '#ffffff', borderColor: '#1d4ed8', borderWidthPx: 2,
+      fontFamily: 'Arial, sans-serif',
+      showBarcode: true, barcodeType: 'barcode', barcodeHeightMm: 10,
+      layoutStyle: 'vertical',
+    },
+  },
+  {
+    id: 'sap-qr',
+    name: 'SAP + QR',
+    desc: 'Large SAP# left · QR right',
+    design: {
+      fields: SAP_QR_FIELDS,
+      cardWidthMm: 95, cardHeightMm: 55, paddingMm: 4,
+      bgColor: '#ffffff', borderColor: '#cccccc', borderWidthPx: 1,
+      fontFamily: 'system-ui, sans-serif',
+      showBarcode: true, barcodeType: 'qr', barcodeHeightMm: 32,
+      layoutStyle: 'side-code-right',
+    },
+  },
+  {
+    id: 'size-breakdown',
+    name: 'Size Breakdown',
+    desc: 'Per-size qty grid · SAP barcode',
+    design: {
+      fields: SIZE_BREAKDOWN_FIELDS,
+      cardWidthMm: 90, cardHeightMm: 65, paddingMm: 4,
+      bgColor: '#ffffff', borderColor: '#cccccc', borderWidthPx: 1,
+      fontFamily: 'system-ui, sans-serif',
+      showBarcode: true, barcodeType: 'barcode', barcodeHeightMm: 8,
+      layoutStyle: 'size-grid',
+    },
+  },
 ]
 
 const DEFAULT_DESIGN: CardDesign = {
@@ -112,6 +304,29 @@ const DEFAULT_DESIGN: CardDesign = {
   fontFamily: 'system-ui, sans-serif',
   showIndex: true,
   showPageNumbers: true,
+  showBarcode: true,
+  barcodeType: 'barcode',
+  barcodeHeightMm: 8,
+  layoutStyle: 'vertical',
+}
+
+// ─── Dummy row for preset previews ────────────────────────────────────────────
+
+const DUMMY_ROW: RowData = {
+  'FTY SAP#':           'IB12345678',
+  'Order Number (GTN)': '0901234567',
+  'Article Number':     'ABC1234',
+  'Model Name':         'MODEL NAME HERE',
+  'PODD':               'PODD 9 April 2026',
+  'Released Date':      'Released 9 Apr 2026',
+  'TOTAL QTY':          '120 prs',
+  'Ship to Country':    'USA',
+  'Sizes':              '4 sizes',
+  _poddTs:              new Date('2026-04-09').getTime(),
+  _sizePairs:           [
+    { size: '7', qty: 30 }, { size: '8', qty: 30 },
+    { size: '9', qty: 30 }, { size: '10', qty: 30 },
+  ],
 }
 
 // ─── Date helper ────────────────────────────────────────────────────────────
@@ -138,23 +353,33 @@ function formatPoddDate(v: unknown): string {
   return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`
 }
 
+const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function formatShortDate(v: unknown): string {
+  const d = parseDateValue(v)
+  if (!d) return String(v ?? '').trim()
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`
+}
+
 // ─── Row transformer ──────────────────────────────────────────────────────────
 
 function transformRow(raw: Record<string, unknown>): RowData {
   // Normalise header keys (handle comma vs period decimal in size cols)
   const norm: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(raw)) {
-    norm[k] = v
-    const mapped = SIZE_COLS_ALT[k]
-    if (mapped && !(mapped in norm)) norm[mapped] = v
+    const trimmed = k.trim()
+    norm[trimmed] = v
+    const canonical = SIZE_COL_LOOKUP[trimmed]
+    if (canonical && !(canonical in norm)) norm[canonical] = v
   }
 
   let sizeCount = 0
+  const sizePairs: Array<{size: string; qty: number}> = []
   for (const col of SIZE_COLS) {
     const v = norm[col]
     if (v === '' || v == null) continue
     const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'))
-    if (!isNaN(n) && n > 0) sizeCount++
+    if (!isNaN(n) && n > 0) { sizeCount++; sizePairs.push({ size: col, qty: n }) }
   }
 
   const str = (col: string) => String(norm[col] ?? '').trim()
@@ -164,17 +389,95 @@ function transformRow(raw: Record<string, unknown>): RowData {
   const poddTs   = parseDateValue(poddRaw)?.getTime() ?? 0
   const qty  = str('TOTAL QTY')
 
+  // Released date — column header: 接单日-Released date
+  const releasedRaw = norm['接单日-Released date']
+  const releasedDate = formatShortDate(releasedRaw)
+
   return {
     'FTY SAP#':           str('FTY SAP#'),
     'Order Number (GTN)': str('Order Number (GTN)'),
     'Article Number':     str('Article Number'),
     'Model Name':         str('Model Name'),
     'PODD':               poddDate ? `PODD ${poddDate}` : '',
+    'Released Date':      releasedDate ? `Released ${releasedDate}` : '',
     _poddTs:              poddTs,
     'TOTAL QTY':          qty  ? `${qty} prs`   : '',
     'Ship to Country':    str('Ship to Country'),
     'Sizes':              sizeCount > 0 ? `${sizeCount} sizes` : '',
+    _sizePairs:           sizePairs,
   }
+}
+
+// ─── SizeGrid ────────────────────────────────────────────────────────────────
+
+function SizeGrid({ pairs, fontFamily }: { pairs: Array<{size: string; qty: number}>; fontFamily: string }) {
+  if (!pairs.length) return (
+    <div style={{ fontSize: '9px', color: '#9ca3af', fontFamily, fontStyle: 'italic', flexShrink: 0 }}>No size data</div>
+  )
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1px 5px', flexShrink: 0, fontFamily }}>
+      {pairs.map(({ size, qty }) => (
+        <span key={size} style={{ fontSize: '10px', lineHeight: '1.5', whiteSpace: 'nowrap', color: '#111827' }}>
+          <span style={{ color: '#6b7280' }}>{size}</span>
+          <span style={{ color: '#9ca3af', margin: '0 1px' }}>/</span>
+          <span style={{ fontWeight: 'bold' }}>{qty}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ─── CodeField (barcode or QR) ───────────────────────────────────────────────
+
+function CodeField({ value, type, heightMm }: {
+  value: string
+  type: 'barcode' | 'qr'
+  heightMm: number
+}) {
+  const svgRef    = useRef<SVGSVGElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // Linear barcode
+  useEffect(() => {
+    if (type !== 'barcode' || !svgRef.current || !value) return
+    try {
+      JsBarcode(svgRef.current, value, {
+        format: 'CODE128',
+        displayValue: false,
+        margin: 0,
+        height: Math.round(heightMm * 3.78),
+        width: 1.2,
+      })
+    } catch {
+      if (svgRef.current) svgRef.current.innerHTML = ''
+    }
+  }, [value, heightMm, type])
+
+  // QR code
+  useEffect(() => {
+    if (type !== 'qr' || !canvasRef.current || !value) return
+    const pxSize = Math.round(heightMm * 3.78)
+    QRCode.toCanvas(canvasRef.current, value, { margin: 1, width: pxSize }).catch(() => {})
+  }, [value, heightMm, type])
+
+  if (!value) return null
+
+  if (type === 'qr') {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+        <canvas
+          ref={canvasRef}
+          style={{ width: `${heightMm}mm`, height: `${heightMm}mm`, imageRendering: 'pixelated' }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+      <svg ref={svgRef} style={{ maxWidth: '100%', height: `${heightMm}mm` }} />
+    </div>
+  )
 }
 
 // ─── CardPreview ──────────────────────────────────────────────────────────────
@@ -188,6 +491,40 @@ interface CardPreviewProps {
 }
 
 function CardPreview({ design, row, index, total, forPrint = false }: CardPreviewProps) {
+  const layoutStyle = design.layoutStyle ?? 'vertical'
+  const gap = forPrint ? '1px' : '2px'
+
+  const fieldsContent = design.fields.map((field) => {
+    const raw = field.columnKey === '__static__'
+      ? (field.staticText ?? '')
+      : String(row[field.columnKey] ?? '')
+    const value = field.prefix + raw + field.suffix
+    const text  = field.showLabel && field.label ? `${field.label}: ${value}` : value
+    return (
+      <div
+        key={field.id}
+        style={{
+          fontSize:   FONT_SIZE_MAP[field.fontSize],
+          fontWeight: field.fontWeight,
+          fontStyle:  field.italic ? 'italic' : 'normal',
+          textAlign:  field.textAlign,
+          lineHeight: '1.3',
+          flexShrink: 0,
+        }}
+      >
+        {text}
+      </div>
+    )
+  })
+
+  const codeEl = design.showBarcode ? (
+    <CodeField
+      value={String(row['FTY SAP#'] ?? '')}
+      type={design.barcodeType ?? 'barcode'}
+      heightMm={design.barcodeHeightMm}
+    />
+  ) : null
+
   return (
     <div
       style={{
@@ -199,9 +536,6 @@ function CardPreview({ design, row, index, total, forPrint = false }: CardPrevie
         fontFamily: design.fontFamily,
         boxSizing: 'border-box',
         overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: forPrint ? '1px' : '2px',
         breakInside: 'avoid',
         position: 'relative',
       }}
@@ -211,32 +545,35 @@ function CardPreview({ design, row, index, total, forPrint = false }: CardPrevie
           position: 'absolute', top: '2px', right: '3px',
           fontSize: '8px', lineHeight: '1', color: '#9ca3af',
           fontFamily: 'system-ui, sans-serif',
+          zIndex: 1,
         }}>
           {index}{total != null ? `/${total}` : ''}
         </div>
       )}
-      {design.fields.map((field) => {
-        const raw = field.columnKey === '__static__'
-          ? (field.staticText ?? '')
-          : String(row[field.columnKey] ?? '')
-        const value = field.prefix + raw + field.suffix
-        const text  = field.showLabel && field.label ? `${field.label}: ${value}` : value
-        return (
-          <div
-            key={field.id}
-            style={{
-              fontSize:   FONT_SIZE_MAP[field.fontSize],
-              fontWeight: field.fontWeight,
-              fontStyle:  field.italic ? 'italic' : 'normal',
-              textAlign:  field.textAlign,
-              lineHeight: '1.3',
-              flexShrink: 0,
-            }}
-          >
-            {text}
+      {layoutStyle === 'side-code-right' && design.showBarcode ? (
+        <div style={{ display: 'flex', height: '100%', gap: '3mm' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap }}>
+            {fieldsContent}
           </div>
-        )
-      })}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {codeEl}
+          </div>
+        </div>
+      ) : layoutStyle === 'size-grid' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap }}>
+          {fieldsContent}
+          <SizeGrid
+            pairs={(row._sizePairs as Array<{size: string; qty: number}> | undefined) ?? []}
+            fontFamily={design.fontFamily}
+          />
+          {codeEl}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap }}>
+          {fieldsContent}
+          {codeEl}
+        </div>
+      )}
     </div>
   )
 }
@@ -293,6 +630,27 @@ function PrintArea({ design, rows }: PrintAreaProps) {
   )
 }
 
+// ─── PresetsPrintArea ────────────────────────────────────────────────────────
+
+function PresetsPrintArea({ presets }: { presets: LayoutPreset[] }) {
+  return (
+    <div id="slcm-presets-print-area">
+      {presets.map((preset, idx) => (
+        <div key={preset.id} className="slcm-preset-section">
+          <div className="slcm-preset-header">
+            {idx + 1}. {preset.name} — {preset.desc}
+          </div>
+          <CardPreview
+            design={{ ...preset.design, showIndex: false, showPageNumbers: false }}
+            row={DUMMY_ROW}
+            forPrint
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SizeLabelCardMaker() {
@@ -314,6 +672,19 @@ export default function SizeLabelCardMaker() {
   })
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
 
+  const [userPresets, setUserPresets] = useState<LayoutPreset[]>(() => {
+    try {
+      const saved = localStorage.getItem('slcm-user-presets')
+      if (saved) return JSON.parse(saved)
+    } catch { /* ignore */ }
+    return []
+  })
+  const [isSavingPreset, setIsSavingPreset]       = useState(false)
+  const [newPresetName, setNewPresetName]         = useState('')
+  const [renamingPresetId, setRenamingPresetId]   = useState<string | null>(null)
+  const [renameValue, setRenameValue]             = useState('')
+  const [isPreviewingPresets, setIsPreviewingPresets] = useState(false)
+
   const sortedRows = useMemo(() => {
     if (!sortRules.length) return rows
     return [...rows].sort((a, b) => {
@@ -334,6 +705,11 @@ export default function SizeLabelCardMaker() {
   useEffect(() => {
     try { localStorage.setItem('slcm-design', JSON.stringify(design)) } catch { /* ignore */ }
   }, [design])
+
+  // Persist user presets
+  useEffect(() => {
+    try { localStorage.setItem('slcm-user-presets', JSON.stringify(userPresets)) } catch { /* ignore */ }
+  }, [userPresets])
 
   // ── file loading ────────────────────────────────────────────────────────────
 
@@ -406,6 +782,46 @@ export default function SizeLabelCardMaker() {
     })
   }
 
+  // ── user preset helpers ────────────────────────────────────────────────────────
+
+  function saveCurrentAsPreset() {
+    const name = newPresetName.trim()
+    if (!name) return
+    const { showIndex: _si, showPageNumbers: _sp, ...presetDesign } = design
+    const preset: LayoutPreset = {
+      id: `user-${Date.now()}`,
+      name,
+      desc: 'Custom preset',
+      design: presetDesign,
+    }
+    setUserPresets((p) => [...p, preset])
+    setIsSavingPreset(false)
+    setNewPresetName('')
+    toast.success(`Preset “${name}” saved`)
+  }
+
+  function deleteUserPreset(id: string) {
+    setUserPresets((p) => p.filter((x) => x.id !== id))
+  }
+
+  function commitRename(id: string) {
+    const name = renameValue.trim()
+    if (name) setUserPresets((p) => p.map((x) => x.id === id ? { ...x, name } : x))
+    setRenamingPresetId(null)
+  }
+
+  // ── preview all presets handler ───────────────────────────────────────────────
+
+  function handlePreviewAllPresets() {
+    setIsPreviewingPresets(true)
+    document.body.classList.add('slcm-presets-print')
+    setTimeout(() => {
+      window.print()
+      document.body.classList.remove('slcm-presets-print')
+      setIsPreviewingPresets(false)
+    }, 200)
+  }
+
   // ── export handler ────────────────────────────────────────────────────────────
 
   function handleExport() {
@@ -441,8 +857,10 @@ export default function SizeLabelCardMaker() {
     style.textContent = `
       @page { size: A4 landscape; margin: 5mm; }
       @media print {
-        body > *:not(#slcm-print-area) { display: none !important; }
+        body:not(.slcm-presets-print) > *:not(#slcm-print-area) { display: none !important; }
+        body.slcm-presets-print > *:not(#slcm-presets-print-area) { display: none !important; }
         #slcm-print-area { display: flex !important; }
+        #slcm-presets-print-area { display: flex !important; }
       }
       #slcm-print-area {
         display: none;
@@ -452,6 +870,32 @@ export default function SizeLabelCardMaker() {
         flex-wrap: wrap;
         gap: 0;
         align-content: flex-start;
+      }
+      #slcm-presets-print-area {
+        display: none;
+        background: white;
+        padding: 5mm;
+        box-sizing: border-box;
+        flex-wrap: wrap;
+        gap: 4mm 6mm;
+        align-content: flex-start;
+        align-items: flex-start;
+      }
+      .slcm-preset-section {
+        display: flex;
+        flex-direction: column;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .slcm-preset-header {
+        font-size: 9px;
+        font-family: system-ui, sans-serif;
+        color: #374151;
+        font-weight: 600;
+        padding-bottom: 1mm;
+        margin-bottom: 1.5mm;
+        border-bottom: 1px solid #d1d5db;
+        white-space: nowrap;
       }
       .slcm-page-break {
         width: 100%;
@@ -516,6 +960,11 @@ export default function SizeLabelCardMaker() {
         <PrintArea design={design} rows={sortedRows} />,
         document.body
       )}
+      {/* Hidden presets preview area */}
+      {createPortal(
+        <PresetsPrintArea presets={[...LAYOUT_PRESETS, ...userPresets]} />,
+        document.body
+      )}
 
       <div className="space-y-6">
         {/* Header */}
@@ -529,12 +978,21 @@ export default function SizeLabelCardMaker() {
               <p className="text-sm text-gray-500">Order summary → Size label cards → PDF export</p>
             </div>
           </div>
-          {step !== 'upload' && (
-            <button onClick={reset}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-100 text-gray-600 transition-colors">
-              <X size={14} /> Start over
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePreviewAllPresets}
+              disabled={isPreviewingPresets}
+              title="Export a PDF showing all presets with sample data — no file upload needed"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-600 hover:text-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
+              <Layers size={14} /> {isPreviewingPresets ? 'Preparing…' : 'Preview Presets PDF'}
             </button>
-          )}
+            {step !== 'upload' && (
+              <button onClick={reset}
+                className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-100 text-gray-600 transition-colors">
+                <X size={14} /> Start over
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Step indicator */}
@@ -698,6 +1156,139 @@ export default function SizeLabelCardMaker() {
               </button>
             </div>
 
+            {/* Layout preset picker */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
+
+              {/* — Built-in presets — */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Built-in presets</span>
+                  <span className="text-xs text-gray-400">— click to apply</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {LAYOUT_PRESETS.map((preset) => {
+                    const active = design.layoutStyle === preset.design.layoutStyle
+                      && design.cardWidthMm === preset.design.cardWidthMm
+                      && design.cardHeightMm === preset.design.cardHeightMm
+                      && design.barcodeType === preset.design.barcodeType
+                    return (
+                      <button
+                        key={preset.id}
+                        onClick={() => setDesign((d) => ({ ...d, ...preset.design, showIndex: d.showIndex, showPageNumbers: d.showPageNumbers }))}
+                        className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-colors ${
+                          active
+                            ? 'border-green-500 bg-green-50 text-green-800'
+                            : 'border-gray-200 hover:border-green-400 hover:bg-green-50/40 text-gray-700'
+                        }`}
+                      >
+                        <span className="text-sm font-semibold leading-tight">{preset.name}</span>
+                        <span className="text-xs text-gray-400 leading-tight mt-0.5">{preset.desc}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100" />
+
+              {/* — My Presets — */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">My Presets</span>
+                    <span className="text-xs text-gray-400">
+                      {userPresets.length > 0 ? `${userPresets.length} saved` : '— none yet'}
+                    </span>
+                  </div>
+                  {!isSavingPreset && (
+                    <button
+                      onClick={() => { setIsSavingPreset(true); setNewPresetName('My Preset') }}
+                      className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-gray-300 hover:border-green-400 hover:bg-green-50 text-gray-600 transition-colors">
+                      <BookmarkPlus size={12} /> Save current
+                    </button>
+                  )}
+                </div>
+
+                {isSavingPreset && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newPresetName}
+                      onChange={(e) => setNewPresetName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveCurrentAsPreset(); if (e.key === 'Escape') setIsSavingPreset(false) }}
+                      className="flex-1 text-sm border border-green-400 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-300"
+                      placeholder="Preset name…"
+                    />
+                    <button onClick={saveCurrentAsPreset}
+                      className="text-xs px-3 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors">
+                      Save
+                    </button>
+                    <button onClick={() => setIsSavingPreset(false)}
+                      className="text-xs px-2 py-1 rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-500 transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {userPresets.length === 0 && !isSavingPreset && (
+                  <p className="text-xs text-gray-400 italic">Configure a card design then click “Save current” to create a preset.</p>
+                )}
+
+                {userPresets.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {userPresets.map((preset) => {
+                      const isRenaming = renamingPresetId === preset.id
+                      const active = design.layoutStyle === preset.design.layoutStyle
+                        && design.cardWidthMm === preset.design.cardWidthMm
+                        && design.cardHeightMm === preset.design.cardHeightMm
+                      return (
+                        <div
+                          key={preset.id}
+                          className={`flex items-start gap-1 px-3 py-2 rounded-lg border transition-colors ${
+                            active ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-400 hover:bg-green-50/40'
+                          }`}
+                        >
+                          <div
+                            className="flex flex-col flex-1 min-w-0 cursor-pointer"
+                            onClick={() => setDesign((d) => ({ ...d, ...preset.design, showIndex: d.showIndex, showPageNumbers: d.showPageNumbers }))}
+                          >
+                            {isRenaming ? (
+                              <input
+                                autoFocus
+                                type="text"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onBlur={() => commitRename(preset.id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') commitRename(preset.id); if (e.key === 'Escape') setRenamingPresetId(null) }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-sm font-semibold border border-green-400 rounded px-1 py-0.5 focus:outline-none w-full"
+                              />
+                            ) : (
+                              <span className="text-sm font-semibold leading-tight text-gray-700">{preset.name}</span>
+                            )}
+                            <span className="text-xs text-gray-400 leading-tight mt-0.5">{preset.desc}</span>
+                          </div>
+                          <button
+                            title="Rename"
+                            onClick={(e) => { e.stopPropagation(); setRenamingPresetId(preset.id); setRenameValue(preset.name) }}
+                            className="p-0.5 text-gray-300 hover:text-gray-600 transition-colors flex-shrink-0 mt-0.5">
+                            <Pencil size={11} />
+                          </button>
+                          <button
+                            title="Delete"
+                            onClick={(e) => { e.stopPropagation(); deleteUserPreset(preset.id) }}
+                            className="p-0.5 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5">
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
               {/* Left: live preview + card settings */}
               <div className="space-y-4">
@@ -729,6 +1320,21 @@ export default function SizeLabelCardMaker() {
                           className="rounded" />
                         <span className="text-xs text-gray-600">Page numbers</span>
                       </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="checkbox" checked={design.showBarcode ?? true}
+                          onChange={(e) => setDesign((d) => ({ ...d, showBarcode: e.target.checked }))}
+                          className="rounded" />
+                        <span className="text-xs text-gray-600">SAP code</span>
+                      </label>
+                      {(design.showBarcode ?? true) && (
+                        <select
+                          value={design.barcodeType ?? 'barcode'}
+                          onChange={(e) => setDesign((d) => ({ ...d, barcodeType: e.target.value as 'barcode' | 'qr' }))}
+                          className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-green-400">
+                          <option value="barcode">Barcode</option>
+                          <option value="qr">QR Code</option>
+                        </select>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -758,8 +1364,14 @@ export default function SizeLabelCardMaker() {
                         </div>
                       </label>
                     ))}
-                  </div>
-                  <label className="space-y-1 block">
+                  </div>                    {design.showBarcode && (
+                      <label className="space-y-1 col-span-2 sm:col-span-1">
+                        <span className="text-xs text-gray-500">Barcode height (mm)</span>
+                        <input type="number" min={4} max={30} value={design.barcodeHeightMm ?? 8}
+                          onChange={(e) => setDesign((d) => ({ ...d, barcodeHeightMm: Number(e.target.value) }))}
+                          className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-400" />
+                      </label>
+                    )}                  <label className="space-y-1 block">
                     <span className="text-xs text-gray-500">Font family</span>
                     <select value={design.fontFamily} onChange={(e) => setDesign((d) => ({ ...d, fontFamily: e.target.value }))}
                       className="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-green-400">
