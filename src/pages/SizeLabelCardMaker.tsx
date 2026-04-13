@@ -9,10 +9,20 @@ import {
   ChevronDown, X, Printer, Eye,
   GripVertical, ArrowUp, ArrowDown,
   Bold, AlignLeft, AlignCenter, AlignRight, Plus, Trash2,
-  BookmarkPlus, Pencil, Layers,
+  BookmarkPlus, Pencil, Layers, Download, FolderOpen,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+const CONFIG_BUNDLE_VERSION = 1
+
+interface ConfigBundle {
+  version: number
+  exportedAt: string
+  design: CardDesign
+  userPresets: LayoutPreset[]
+  pdfScale: number
+}
 
 type Step = 'upload' | 'data' | 'design'
 type LayoutStyle = 'vertical' | 'side-code-right' | 'size-grid'
@@ -329,6 +339,26 @@ const DUMMY_ROW: RowData = {
   ],
 }
 
+const DUMMY_ROWS: RowData[] = [
+  DUMMY_ROW,
+  {
+    'FTY SAP#': 'IB98765432', 'Order Number (GTN)': 'GTN0987654',
+    'Article Number': 'XYZ5678', 'Model Name': 'SECOND SAMPLE MODEL',
+    'PODD': 'PODD 15 April 2026', 'Released Date': 'Released 10 Apr 2026',
+    'TOTAL QTY': '240 prs', 'Ship to Country': 'GER', 'Sizes': '3 sizes',
+    _poddTs: new Date('2026-04-15').getTime(),
+    _sizePairs: [{ size: '6', qty: 80 }, { size: '7', qty: 80 }, { size: '8', qty: 80 }],
+  },
+  {
+    'FTY SAP#': 'IB11223344', 'Order Number (GTN)': 'GTN1122334',
+    'Article Number': 'DEF9012', 'Model Name': 'THIRD SAMPLE MODEL',
+    'PODD': 'PODD 20 April 2026', 'Released Date': 'Released 15 Apr 2026',
+    'TOTAL QTY': '60 prs', 'Ship to Country': 'JPN', 'Sizes': '5 sizes',
+    _poddTs: new Date('2026-04-20').getTime(),
+    _sizePairs: [{ size: '5', qty: 12 }, { size: '6', qty: 12 }, { size: '7', qty: 12 }, { size: '8', qty: 12 }, { size: '9', qty: 12 }],
+  },
+]
+
 // ─── Date helper ────────────────────────────────────────────────────────────
 
 const MONTH_NAMES = [
@@ -488,9 +518,10 @@ interface CardPreviewProps {
   index?: number
   total?: number
   forPrint?: boolean
+  printScale?: number
 }
 
-function CardPreview({ design, row, index, total, forPrint = false }: CardPreviewProps) {
+function CardPreview({ design, row, index, total, forPrint = false, printScale }: CardPreviewProps) {
   const layoutStyle = design.layoutStyle ?? 'vertical'
   const gap = forPrint ? '1px' : '2px'
 
@@ -538,6 +569,7 @@ function CardPreview({ design, row, index, total, forPrint = false }: CardPrevie
         overflow: 'hidden',
         breakInside: 'avoid',
         position: 'relative',
+        ...(forPrint && printScale != null ? { zoom: printScale } : {}),
       }}
     >
       {design.showIndex && index != null && (
@@ -585,12 +617,16 @@ function CardPreview({ design, row, index, total, forPrint = false }: CardPrevie
 interface PrintAreaProps {
   design: CardDesign
   rows: RowData[]
+  pdfScale: number
 }
 
-function PrintArea({ design, rows }: PrintAreaProps) {
+function PrintArea({ design, rows, pdfScale }: PrintAreaProps) {
   // A4 landscape printable area with 5mm margins: ~287mm × 200mm
-  const perRow  = Math.max(1, Math.floor(287 / design.cardWidthMm))
-  const perCol  = Math.max(1, Math.floor(200 / design.cardHeightMm))
+  // Effective card dimensions account for the pdfScale zoom applied to each card
+  const effectiveW = design.cardWidthMm * pdfScale
+  const effectiveH = design.cardHeightMm * pdfScale
+  const perRow  = Math.max(1, Math.floor(287 / effectiveW))
+  const perCol  = Math.max(1, Math.floor(200 / effectiveH))
   const perPage = perRow * perCol
   const total   = rows.length
 
@@ -613,6 +649,7 @@ function PrintArea({ design, rows }: PrintAreaProps) {
                 index={globalIdx + 1}
                 total={total}
                 forPrint
+                printScale={pdfScale}
               />
             )
           })}
@@ -657,7 +694,8 @@ export default function SizeLabelCardMaker() {
   const [step, setStep]       = useState<Step>('upload')
   const [fileName, setFileName] = useState('')
   const [isDragging, setIsDragging] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef       = useRef<HTMLInputElement>(null)
+  const configImportRef     = useRef<HTMLInputElement>(null)
 
   const [rows, setRows]       = useState<RowData[]>([])
   const [sortRules, setSortRules] = useState<SortRule[]>(DEFAULT_SORT)
@@ -685,6 +723,15 @@ export default function SizeLabelCardMaker() {
   const [renameValue, setRenameValue]             = useState('')
   const [isPreviewingPresets, setIsPreviewingPresets] = useState(false)
 
+  const [isDemoMode, setIsDemoMode] = useState(false)
+  const [pdfScale, setPdfScale]     = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('slcm-pdf-scale')
+      if (saved) { const n = parseFloat(saved); if (!isNaN(n)) return n }
+    } catch { /* ignore */ }
+    return 1.0
+  })
+
   const sortedRows = useMemo(() => {
     if (!sortRules.length) return rows
     return [...rows].sort((a, b) => {
@@ -710,6 +757,11 @@ export default function SizeLabelCardMaker() {
   useEffect(() => {
     try { localStorage.setItem('slcm-user-presets', JSON.stringify(userPresets)) } catch { /* ignore */ }
   }, [userPresets])
+
+  // Persist pdf scale
+  useEffect(() => {
+    try { localStorage.setItem('slcm-pdf-scale', String(pdfScale)) } catch { /* ignore */ }
+  }, [pdfScale])
 
   // ── file loading ────────────────────────────────────────────────────────────
 
@@ -745,6 +797,7 @@ export default function SizeLabelCardMaker() {
   function reset() {
     setStep('upload'); setFileName(''); setRows([])
     setDesign(DEFAULT_DESIGN); setEditingFieldId(null)
+    setIsDemoMode(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -808,6 +861,48 @@ export default function SizeLabelCardMaker() {
     const name = renameValue.trim()
     if (name) setUserPresets((p) => p.map((x) => x.id === id ? { ...x, name } : x))
     setRenamingPresetId(null)
+  }
+
+  // ── config export / import ────────────────────────────────────────────────────
+
+  function exportConfig() {
+    const bundle: ConfigBundle = {
+      version: CONFIG_BUNDLE_VERSION,
+      exportedAt: new Date().toISOString(),
+      design,
+      userPresets,
+      pdfScale,
+    }
+    const json = JSON.stringify(bundle, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `slcm-config-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Card design configuration exported')
+  }
+
+  function importConfig(file: File) {
+    if (!file.name.match(/\.json$/i)) {
+      toast.error('Please select a .json configuration file')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const bundle = JSON.parse(e.target?.result as string) as Partial<ConfigBundle>
+        if (bundle.design)      setDesign({ ...DEFAULT_DESIGN, ...bundle.design })
+        if (bundle.userPresets) setUserPresets(bundle.userPresets)
+        if (typeof bundle.pdfScale === 'number') setPdfScale(bundle.pdfScale)
+        toast.success('Configuration imported successfully')
+      } catch {
+        toast.error('Failed to parse the configuration file')
+      }
+    }
+    reader.readAsText(file)
+    if (configImportRef.current) configImportRef.current.value = ''
   }
 
   // ── preview all presets handler ───────────────────────────────────────────────
@@ -957,7 +1052,7 @@ export default function SizeLabelCardMaker() {
 
       {/* Hidden print area — portalled directly into <body> so print CSS can target it */}
       {createPortal(
-        <PrintArea design={design} rows={sortedRows} />,
+        <PrintArea design={design} rows={sortedRows} pdfScale={pdfScale} />,
         document.body
       )}
       {/* Hidden presets preview area */}
@@ -979,6 +1074,25 @@ export default function SizeLabelCardMaker() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <input
+              ref={configImportRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) importConfig(f) }}
+            />
+            <button
+              onClick={() => configImportRef.current?.click()}
+              title="Import a previously exported card design configuration (.json)"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:border-violet-400 hover:bg-violet-50 text-gray-600 hover:text-violet-700 transition-colors">
+              <FolderOpen size={14} /> Import Config
+            </button>
+            <button
+              onClick={exportConfig}
+              title="Export current card design, user presets and PDF scale to a .json file"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:border-violet-400 hover:bg-violet-50 text-gray-600 hover:text-violet-700 transition-colors">
+              <Download size={14} /> Export Config
+            </button>
             <button
               onClick={handlePreviewAllPresets}
               disabled={isPreviewingPresets}
@@ -1019,23 +1133,45 @@ export default function SizeLabelCardMaker() {
 
         {/* ══ STEP 1: UPLOAD ═══════════════════════════════════════════════════ */}
         {step === 'upload' && (
-          <div
-            onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer select-none transition-colors ${
-              isDragging ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-green-400 hover:bg-green-50/40'
-            }`}
-          >
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.ods,.csv" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) loadFile(f) }} />
-            <FileSpreadsheet size={56} className={`mx-auto mb-4 ${isDragging ? 'text-green-500' : 'text-gray-300'}`} />
-            <p className="text-lg font-semibold text-gray-700 mb-1">
-              {isDragging ? 'Drop it here!' : 'Upload the order summary Excel file'}
-            </p>
-            <p className="text-sm text-gray-400">Drag & drop or click to browse · .xlsx, .xls, .ods, .csv</p>
-            <p className="text-xs text-gray-300 mt-3">
-              Reads: FTY SAP# · Order Number (GTN) · Article Number · Model Name · PODD · TOTAL QTY · Ship to Country · sizes
-            </p>
+          <div className="space-y-4">
+            <div
+              onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer select-none transition-colors ${
+                isDragging ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-green-400 hover:bg-green-50/40'
+              }`}
+            >
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.ods,.csv" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) loadFile(f) }} />
+              <FileSpreadsheet size={56} className={`mx-auto mb-4 ${isDragging ? 'text-green-500' : 'text-gray-300'}`} />
+              <p className="text-lg font-semibold text-gray-700 mb-1">
+                {isDragging ? 'Drop it here!' : 'Upload the order summary Excel file'}
+              </p>
+              <p className="text-sm text-gray-400">Drag & drop or click to browse · .xlsx, .xls, .ods, .csv</p>
+              <p className="text-xs text-gray-300 mt-3">
+                Reads: FTY SAP# · Order Number (GTN) · Article Number · Model Name · PODD · TOTAL QTY · Ship to Country · sizes
+              </p>
+            </div>
+
+            {/* Design without file */}
+            <div className="flex flex-col items-center gap-3 py-2">
+              <div className="flex items-center gap-4 w-full max-w-sm">
+                <div className="flex-1 border-t border-gray-200" />
+                <span className="text-xs text-gray-400 select-none">or</span>
+                <div className="flex-1 border-t border-gray-200" />
+              </div>
+              <button
+                onClick={() => {
+                  setRows(DUMMY_ROWS)
+                  setIsDemoMode(true)
+                  setStep('design')
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-300 hover:border-green-400 hover:bg-green-50 text-gray-600 hover:text-green-700 text-sm font-medium transition-colors shadow-sm">
+                <Palette size={15} />
+                Design with sample data
+              </button>
+              <p className="text-xs text-gray-400">Customize card layout without uploading a file — upload later to generate real cards</p>
+            </div>
           </div>
         )}
 
@@ -1142,9 +1278,14 @@ export default function SizeLabelCardMaker() {
               <span className="font-medium text-gray-700">Card Designer</span>
               <span className="text-gray-300">·</span>
               <span className="text-gray-500">{rows.length} cards</span>
-              <button onClick={() => setStep('data')}
+              {isDemoMode && (
+                <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 font-medium">
+                  <Eye size={12} /> Sample data
+                </span>
+              )}
+              <button onClick={() => { if (isDemoMode) { reset() } else { setStep('data') } }}
                 className="text-xs px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-100 text-gray-600 transition-colors">
-                ← Back to data
+                {isDemoMode ? '← Upload a file' : '← Back to data'}
               </button>
               <button onClick={() => { setDesign(DEFAULT_DESIGN); localStorage.removeItem('slcm-design') }}
                 className="text-xs px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-100 text-gray-600 transition-colors">
@@ -1296,10 +1437,17 @@ export default function SizeLabelCardMaker() {
                   <div className="flex items-center gap-2 mb-4">
                     <Eye size={14} className="text-gray-500" />
                     <span className="text-sm font-semibold text-gray-700">Live Preview</span>
-                    <span className="text-xs text-gray-400 ml-1">— first row</span>
+                    <span className="text-xs text-gray-400 ml-1">— {isDemoMode ? 'sample data' : 'first row'}</span>
+                    {pdfScale !== 1 && (
+                      <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-mono">
+                        {Math.round(pdfScale * 100)}% scale
+                      </span>
+                    )}
                   </div>
                   <div className="flex justify-center overflow-auto">
-                    <CardPreview design={design} row={previewRow} index={1} total={totalCards} />
+                    <div style={{ zoom: pdfScale, transition: 'zoom 0.12s ease' }}>
+                      <CardPreview design={design} row={previewRow} index={1} total={totalCards} />
+                    </div>
                   </div>
                 </div>
 
@@ -1378,6 +1526,32 @@ export default function SizeLabelCardMaker() {
                       {FONT_FAMILIES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                     </select>
                   </label>
+
+                  {/* PDF Scale */}
+                  <div className="space-y-1.5 pt-1 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500 font-medium">PDF Scale — {Math.round(pdfScale * 100)}%</span>
+                      {pdfScale !== 1 && (
+                        <button onClick={() => setPdfScale(1)} className="text-xs text-gray-400 hover:text-gray-600 underline transition-colors">Reset to 100%</button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400 w-8 text-right">50%</span>
+                      <input
+                        type="range" min={0.5} max={2.0} step={0.05} value={pdfScale}
+                        onChange={(e) => setPdfScale(parseFloat(e.target.value))}
+                        className="flex-1 accent-green-600 cursor-pointer"
+                      />
+                      <span className="text-xs text-gray-400 w-10">200%</span>
+                      <input
+                        type="number" min={50} max={200} value={Math.round(pdfScale * 100)}
+                        onChange={(e) => { const v = Number(e.target.value); if (!isNaN(v)) setPdfScale(Math.max(0.5, Math.min(2.0, v / 100))) }}
+                        className="w-16 text-sm text-center border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-400"
+                      />
+                      <span className="text-xs text-gray-400">%</span>
+                    </div>
+                    <p className="text-xs text-gray-400">Scales card size in the exported PDF — useful to fit more cards per page or make larger prints.</p>
+                  </div>
                 </div>
               </div>
 

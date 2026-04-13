@@ -44,7 +44,7 @@ Persistent task list backed by SQLite. Add, edit, complete, and delete tasks —
 
 ### Size Label Card Maker
 
-Upload an Excel order summary, review and sort the imported rows, design per-field card layout (font, size, alignment, prefix/suffix), then export print-ready size label cards directly to PDF.
+Upload an Excel order summary, review and sort the imported rows, then design per-field card layout (font, size, alignment, prefix/suffix, barcode or QR code). Choose from eight built-in layout presets or save your own. Export print-ready size label cards directly to PDF. Save and load the full design configuration as a JSON file.
 
 ### Carton Catalog
 
@@ -71,6 +71,7 @@ Built-in bilingual help documentation (English / Indonesian).
 - **Routing**: [React Router DOM](https://reactrouter.com/) 7
 - **3D rendering**: [Three.js](https://threejs.org/) + [`@react-three/fiber`](https://docs.pmnd.rs/react-three-fiber) + [`@react-three/drei`](https://github.com/pmndrs/drei)
 - **Excel I/O**: [xlsx](https://sheetjs.com/) (SheetJS)
+- **Barcodes**: [JsBarcode](https://github.com/lindell/JsBarcode) (CODE128 linear) + [qrcode](https://github.com/soldair/node-qrcode) (QR)
 - **Auto-update**: [electron-updater](https://www.electron.build/auto-update)
 - **Icons**: [lucide-react](https://lucide.dev/)
 - **Notifications**: [Sonner](https://sonner.emilkowal.ski/)
@@ -105,8 +106,9 @@ npm run build
 
 Outputs are placed in `release/{version}/`. The build produces:
 
-- **Windows**: NSIS installer (`x64`) and portable executable (`x64`)
-- **macOS**: DMG and ZIP
+- **Windows**: portable executable (`x64`) — the default `npm run build` script targets portable only
+
+To build all targets defined in `electron-builder.json` (NSIS installer, macOS DMG/ZIP), run `npx electron-builder` directly.
 
 ## Directory Structure
 
